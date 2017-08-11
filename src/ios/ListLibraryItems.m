@@ -133,26 +133,26 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                 else {
                     NSError * err = nil;
                     NSString * mime_type = [headers objectForKey:@"Content-Type"];
-                    NSMutableURLRequest * request =  [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:@"POST"
-                                                                                                                URLString:uploadUrl
-                                                                                                               parameters:nil
-                                                                                                constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
-                                                                                                    NSError * error = nil;
-                                                                                                    [formData appendPartWithFileURL:temp_url name:fileId error:&error];
-                                                                                                    if(error) {
-                                                                                                        NSLog(@"%@", error);
-                                                                                                    }
-                                                                                                }
-                                                                                                                    error:&err];
-                    
-                    
-                    request = [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:@"POST"
-                                                                                         URLString:uploadUrl
-                                                                                        parameters:nil
-                                                                         constructingBodyWithBlock:^(id<AFMultipartFormData>  _Nonnull formData) {
-                        [formData appendPartWithFileURL:temp_url name:fileId fileName:fileId mimeType:mime_type error:nil];
-                    }
-                                                                                             error:nil];
+//                    NSMutableURLRequest * request =  [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:@"POST"
+//                                                                                                                URLString:uploadUrl
+//                                                                                                               parameters:nil
+//                                                                                                constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+//                                                                                                    NSError * error = nil;
+//                                                                                                    [formData appendPartWithFileURL:temp_url name:fileId error:&error];
+//                                                                                                    if(error) {
+//                                                                                                        NSLog(@"%@", error);
+//                                                                                                    }
+//                                                                                                }
+//                                                                                                                    error:&err];
+//                    
+//                    
+//                    request = [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:@"POST"
+//                                                                                         URLString:uploadUrl
+//                                                                                        parameters:nil
+//                                                                         constructingBodyWithBlock:^(id<AFMultipartFormData>  _Nonnull formData) {
+//                        [formData appendPartWithFileURL:temp_url name:fileId fileName:fileId mimeType:mime_type error:nil];
+//                    }
+//                                                                                             error:nil];
                     
 //                {
 //                        
@@ -173,9 +173,9 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
                 
                     
-//                    NSMutableURLRequest * request = [[AFHTTPRequestSerializer serializer] requestWithMethod:@"POST" URLString:uploadUrl parameters:nil error:nil];
-//                    [request setHTTPMethod:@"POST"];
-//                    [request setHTTPBodyStream:[NSInputStream inputStreamWithURL:temp_url]];
+                    NSMutableURLRequest * request = [[AFHTTPRequestSerializer serializer] requestWithMethod:@"POST" URLString:uploadUrl parameters:nil error:nil];
+                    [request setHTTPMethod:@"POST"];
+                    [request setHTTPBodyStream:[NSInputStream inputStreamWithURL:temp_url]];
                     for(NSString * header in [headers allKeys]) {
                         [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
                     }
