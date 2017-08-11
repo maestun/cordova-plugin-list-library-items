@@ -4,20 +4,20 @@
 #import <Photos/Photos.h>
 #import <MobileCoreServices/MobileCoreServices.h>
 
+#import "AFURLSessionManager.h"
+
 static NSString * PERMISSION_ERROR = @"Permission Denial: This application is not allowed to access Photo data.";
 
 
 @implementation ListLibraryItems
  
-- (void)pluginInitialize
-{
+- (void)pluginInitialize {
 	// Plugin specific initialize login goes here
 }
 
 
 - (BOOL)checkAuthorization {
     return ([PHPhotoLibrary authorizationStatus] == PHAuthorizationStatusAuthorized);
-
 }
 
 
@@ -73,6 +73,156 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 }
 
 
+- (void)returnUploadResult:(BOOL)aAuthorized message:(NSString *)aMessage command:(CDVInvokedUrlCommand *)aCommand {
+    CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+    if(aAuthorized == NO) {
+        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:aMessage];
+    }
+    [[self commandDelegate] sendPluginResult:pluginResult callbackId:[aCommand callbackId]];
+}
+
+
+- (void)uploadItem:(CDVInvokedUrlCommand *)command {
+    /*
+     var payload = {
+     "id": "sj5f9"
+     "filePath": "/storage/emulated/0/Download/Heli.divx",
+     "serverUrl": "http://requestb.in/14cizzj1",
+     "headers": {
+     "api_key": "asdasdwere123sad"
+     },
+     "parameters": {
+     "signature": "mysign",
+     "timestamp": 112321321
+     }
+     };
+     
+     uploader.startUpload(options);
+    */
+    NSDictionary * payload = command.arguments[0];
+    NSString * uploadUrl  = payload[@"serverUrl"];
+//    NSString * filePath  = payload[@"filePath"];
+    NSDictionary * headers = payload[@"headers"];
+//    NSDictionary * parameters = payload[@"parameters"];
+    NSString * libraryId = payload[@"libraryId"];
+    NSString * fileId = payload[@"id"];
+    
+    
+    // try to fetch asset
+    PHFetchResult<PHAsset *> * assets = [PHAsset fetchAssetsWithLocalIdentifiers:@[libraryId] options:kNilOptions];
+    if([assets count] == 0) {
+        // asset id not found
+        [self returnUploadResult:NO message:[NSString stringWithFormat:@"Cannot fetch asset %@", libraryId] command:command];
+    }
+    else {
+        for(PHAsset * asset in assets) {
+            PHAssetResource * resource = [[PHAssetResource assetResourcesForAsset:asset] firstObject];;
+            NSString * temp_path = [NSTemporaryDirectory() stringByAppendingString:[resource originalFilename]];
+            NSURL * temp_url = [NSURL fileURLWithPath:temp_path];
+            [[NSFileManager defaultManager] removeItemAtURL:temp_url error:nil]; // cleanup
+            PHAssetResourceRequestOptions * options = [PHAssetResourceRequestOptions new];
+            [options setNetworkAccessAllowed: NO];
+            [options setProgressHandler:^(double progress) {
+                NSLog(@"progress %f", progress);
+            }];
+            
+            [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:temp_url options:options completionHandler:^(NSError * _Nullable aError) {
+                if (aError) {
+                    [self returnUploadResult:NO message:[NSString stringWithFormat:@"Cannot fetch asset %@", libraryId] command:command];
+                }
+                else {
+                    NSError * err = nil;
+                    NSString * mime_type = [headers objectForKey:@"Content-Type"];
+                    NSMutableURLRequest * request =  [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:@"POST"
+                                                                                                                URLString:uploadUrl
+                                                                                                               parameters:nil
+                                                                                                constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+                                                                                                    NSError * error = nil;
+                                                                                                    [formData appendPartWithFileURL:temp_url name:fileId error:&error];
+                                                                                                    if(error) {
+                                                                                                        NSLog(@"%@", error);
+                                                                                                    }
+                                                                                                }
+                                                                                                                    error:&err];
+                    
+                    
+                    request = [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:@"POST"
+                                                                                         URLString:uploadUrl
+                                                                                        parameters:nil
+                                                                         constructingBodyWithBlock:^(id<AFMultipartFormData>  _Nonnull formData) {
+                        [formData appendPartWithFileURL:temp_url name:fileId fileName:fileId mimeType:mime_type error:nil];
+                    }
+                                                                                             error:nil];
+                    
+//                {
+//                        
+//                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
+//                    NSURLSession * defaultSession = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
+//
+//                    NSMutableURLRequest *mutableRequest = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
+//                    mutableRequest.HTTPMethod = @"POST";
+//                    
+//                    for(NSString * header in [headers allKeys]) {
+//                        [mutableRequest setValue:[headers objectForKey:header] forHTTPHeaderField:header];
+//                    }
+//
+//                    NSURLSessionUploadTask *uploadTask = [defaultSession uploadTaskWithRequest:mutableRequest fromFile:temp_url];
+//                    [uploadTask resume];
+//                    return;
+//                }
+
+                
+                    
+//                    NSMutableURLRequest * request = [[AFHTTPRequestSerializer serializer] requestWithMethod:@"POST" URLString:uploadUrl parameters:nil error:nil];
+//                    [request setHTTPMethod:@"POST"];
+//                    [request setHTTPBodyStream:[NSInputStream inputStreamWithURL:temp_url]];
+                    for(NSString * header in [headers allKeys]) {
+                        [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
+                    }
+//
+//                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
+//                    
+//                    NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue: [NSOperationQueue mainQueue]];
+//                    NSURLSessionUploadTask * task = [session uploadTaskWithStreamedRequest:request];
+//                    
+//                    [task resume];
+//
+//                    return;
+
+                    
+                    
+                    AFURLSessionManager * manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
+                    NSURLSessionUploadTask * uploadTask = [manager uploadTaskWithStreamedRequest:request progress:^(NSProgress * _Nonnull uploadProgress) {
+                        // call js every 1 %
+                        static double prev_progress = 0;
+                        if([uploadProgress fractionCompleted] - prev_progress > 0.01) {
+                            prev_progress = [uploadProgress fractionCompleted];
+                            // TODO: call onProgress
+                        }
+                        NSLog(@"%@", uploadProgress);
+                    }
+                    completionHandler:^(NSURLResponse * _Nonnull response, id  _Nullable responseObject, NSError * _Nullable aError) {
+                        NSHTTPURLResponse * httpResponse = (NSHTTPURLResponse *) response;
+                        long status = (long)[httpResponse statusCode];
+                        
+                        [[NSFileManager defaultManager] removeItemAtURL:temp_url error:nil];
+                        if (aError && status >= 400) {
+                          NSLog(@"Error: %@", aError);
+                          [self returnUploadResult:NO message:[NSString stringWithFormat:@"upload error: %@", [aError localizedDescription]] command:command];
+                      } else {
+                          NSLog(@"%@ %@", response, responseObject);
+                          [self returnUploadResult:YES message:[NSString stringWithFormat:@"upload error: %@", [aError localizedDescription]] command:command];
+                      }
+                    }];
+                                
+                    [uploadTask resume];
+                }
+            }];
+        }
+    }
+}
+
+
 - (void)listItems:(CDVInvokedUrlCommand *)command {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // check permissions
@@ -81,7 +231,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         }
         else {
-        
             // parse options
             BOOL includePictures = [[command argumentAtIndex:0 withDefault:[NSNumber numberWithBool:YES]] boolValue];
             BOOL includeVideos = [[command argumentAtIndex:1 withDefault:[NSNumber numberWithBool:YES]] boolValue];
@@ -167,6 +316,32 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         }
     }
     return mimeType;
+}
+
+
+#pragma mark - NSURLSessionDelegate
+- (void)URLSession:(NSURLSession *)session didBecomeInvalidWithError:(NSError *)error {
+    NSLog(@"didBecomeInvalidWithError");
+}
+
+- (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler {
+    NSLog(@"didReceiveChallenge");
+}
+
+- (void)URLSessionDidFinishEventsForBackgroundURLSession:(NSURLSession *)session {
+ NSLog(@"URLSessionDidFinishEventsForBackgroundURLSession");
+}
+
+#pragma mark - NSURLSessionTaskDelegate
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didSendBodyData:(int64_t)bytesSent totalBytesSent:(int64_t)totalBytesSent totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
+ NSLog(@"didSendBodyData");
+}
+
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
+ NSLog(@"didCompleteWithError");
+}
+- (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task needNewBodyStream:(nonnull void (^)(NSInputStream * _Nullable))completionHandler {
+ NSLog(@"needNewBodyStream");
 }
 
 @end
