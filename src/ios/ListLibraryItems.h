@@ -1,7 +1,7 @@
 // TODO comments, header
 #import <Cordova/CDV.h>
 
-@interface ListLibraryItems : CDVPlugin <NSURLSessionDelegate, NSURLSessionTaskDelegate, NSURLSessionDataDelegate, NSURLSessionDownloadDelegate, NSURLSessionStreamDelegate>
+@interface ListLibraryItems : CDVPlugin <NSURLSessionDelegate, NSURLSessionTaskDelegate, NSURLSessionDataDelegate>
 
 - (void)pluginInitialize;
 - (void)isAuthorized:(CDVInvokedUrlCommand *)command;
