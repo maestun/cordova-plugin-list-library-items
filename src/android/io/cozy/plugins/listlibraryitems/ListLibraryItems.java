@@ -1,6 +1,6 @@
 // TODO comments, header
 
-package io.cozy.plugins;
+package io.cozy.plugins.listlibraryitems;
 
 import android.content.Context;
 import android.database.Cursor;
@@ -32,26 +32,17 @@ import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 
 public class ListLibraryItems extends CordovaPlugin {
 
-    private final  Context mContext = this.cordova.getActivity().getApplicationContext();
+    private Context mContext;
     private static final String PERMISSION_ERROR = "Permission Denial: This application is not allowed to access Photo data.";
     private SimpleDateFormat mDateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
-
-    private interface ChunkResultRunnable {
-        void run(ArrayList<JSONObject> chunk, int chunkNum, boolean isLastChunk);
-    }
-
-
-    @Override
-    protected void pluginInitialize() {
-        super.pluginInitialize();
-    }
 
     @Override
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         // Plugin specific one off initialization code here, this one doesn't
         // have any
+        mContext = this.cordova.getActivity().getApplicationContext();
     }
 
     @Override
@@ -68,32 +59,16 @@ public class ListLibraryItems extends CordovaPlugin {
             cordova.getThreadPool().execute(new Runnable() {
                 public void run() {
                     try {
-
-                        final JSONObject options = args.optJSONObject(0);
-                        final int itemsInChunk = options.getInt("itemsInChunk");
-                        final double chunkTimeSec = options.getDouble("chunkTimeSec");
-
                         if (!cordova.hasPermission(READ_EXTERNAL_STORAGE)) {
                             callbackContext.error(PERMISSION_ERROR);
                             return;
                         }
 
-                        listItems(args.getBoolean(0), args.getBoolean(1), args.getBoolean(2), itemsInChunk, chunkTimeSec, new ChunkResultRunnable() {
-                            @Override
-                            public void run(ArrayList<JSONObject> library, int chunkNum, boolean isLastChunk) {
-                                try {
-
-                                    JSONObject result = createListItemsResult(library, chunkNum, isLastChunk);
-                                    PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
-                                    pluginResult.setKeepCallback(!isLastChunk);
-                                    callbackContext.sendPluginResult(pluginResult);
-
-                                } catch (Exception e) {
-                                    e.printStackTrace();
-                                    callbackContext.error(e.getMessage());
-                                }
-                            }
-                        });
+                        ArrayList<JSONObject> library = listItems(args.getBoolean(0), args.getBoolean(1), args.getBoolean(2));
+                        JSONObject result = new JSONObject();
+                        result.put("library", new JSONArray(library));
+                        PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, result);
+                        callbackContext.sendPluginResult(pluginResult);
 
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -109,19 +84,11 @@ public class ListLibraryItems extends CordovaPlugin {
     }
 
 
-    private static JSONObject createListItemsResult(ArrayList<JSONObject> library, int chunkNum, boolean isLastChunk) throws JSONException {
-        JSONObject result = new JSONObject();
-        result.put("chunkNum", chunkNum);
-        result.put("isLastChunk", isLastChunk);
-        result.put("library", new JSONArray(library));
-        return result;
-    }
-
-
     private void isAuthorized(CallbackContext callbackContext) {
         boolean ok = cordova.hasPermission(READ_EXTERNAL_STORAGE);
         callbackContext.success(ok ? 1 : 0);
     }
+
 
     private void requestReadAuthorization(CallbackContext callbackContext) {
         try {
@@ -138,9 +105,7 @@ public class ListLibraryItems extends CordovaPlugin {
         }
     }
 
-    private void listItems(boolean includePictures, boolean includeVideos, boolean includeCloud,
-                           int itemsInChunk, double chunkTimeSec,
-                           ChunkResultRunnable completion) {
+    private ArrayList<JSONObject> listItems(boolean includePictures, boolean includeVideos, boolean includeCloud) {
         try {
             // All columns here: https://developer.android.com/reference/android/provider/MediaStore.Images.ImageColumns.html,
             // https://developer.android.com/reference/android/provider/MediaStore.MediaColumns.html
@@ -156,80 +121,23 @@ public class ListLibraryItems extends CordovaPlugin {
                 put("nativeURL", MediaStore.MediaColumns.DATA); // will not be returned to javascript
             }};
 
+            final ArrayList<JSONObject> queryResults = queryContentProvider(mContext, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columns);
+            queryResults.addAll(queryContentProvider(mContext, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, columns));
+            queryResults.addAll(queryContentProvider(mContext, MediaStore.Images.Media.INTERNAL_CONTENT_URI, columns));
+            queryResults.addAll(queryContentProvider(mContext, MediaStore.Video.Media.INTERNAL_CONTENT_URI, columns));
 
-            final ArrayList<JSONObject> queryResults = queryContentProvider(mContext, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columns, "");
+            return queryResults;
+        } catch (Exception ex) {
+            return null;
 
-            ArrayList<JSONObject> chunk = new ArrayList<JSONObject>();
-
-            long chunkStartTime = SystemClock.elapsedRealtime();
-            int chunkNum = 0;
-
-            for (int i = 0; i < queryResults.size(); i++) {
-                JSONObject queryResult = queryResults.get(i);
-
-                // swap width and height if needed
-
-                int orientation = getImageOrientation(new File(queryResult.getString("nativeURL")));
-                if (isOrientationSwapsDimensions(orientation)) { // swap width and height
-                    int tempWidth = queryResult.getInt("width");
-                    queryResult.put("width", queryResult.getInt("height"));
-                    queryResult.put("height", tempWidth);
-                }
-
-
-                // photoId is in format "imageid;imageurl"
-                queryResult.put("id",queryResult.get("id") + ";" + queryResult.get("nativeURL"));
-
-                queryResult.remove("nativeURL"); // Not needed
-
-                String albumId = queryResult.getString("albumId");
-                queryResult.remove("albumId");
-                if (false /* includeAlbumData */) {
-                    JSONArray albumsArray = new JSONArray();
-                    albumsArray.put(albumId);
-                    queryResult.put("albumIds", albumsArray);
-                }
-
-                chunk.add(queryResult);
-
-                if (i == queryResults.size() - 1) { // Last item
-                    completion.run(chunk, chunkNum, true);
-                } else if ((itemsInChunk > 0 && chunk.size() == itemsInChunk) || (chunkTimeSec > 0 && (SystemClock.elapsedRealtime() - chunkStartTime) >= chunkTimeSec * 1000)) {
-                    completion.run(chunk, chunkNum, false);
-                    chunkNum += 1;
-                    chunk = new ArrayList<JSONObject>();
-                    chunkStartTime = SystemClock.elapsedRealtime();
-                }
-            }
-
-        } catch (JSONException ex) {
-            // TODO:
-
-        } catch (IOException ex) {
-            // Do nothing
         }
     }
 
 
-    private static int getImageOrientation(File imageFile) throws IOException {
+    private ArrayList<JSONObject> queryContentProvider(Context context, Uri collection, JSONObject columns) throws Exception {
 
-        ExifInterface exif = new ExifInterface(imageFile.getAbsolutePath());
-        int orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL);
-
-        return orientation;
-    }
-
-
-    // Returns true if orientation rotates image by 90 or 270 degrees.
-    private static boolean isOrientationSwapsDimensions(int orientation) {
-        return orientation == ExifInterface.ORIENTATION_TRANSPOSE // 5
-                || orientation == ExifInterface.ORIENTATION_ROTATE_90 // 6
-                || orientation == ExifInterface.ORIENTATION_TRANSVERSE // 7
-                || orientation == ExifInterface.ORIENTATION_ROTATE_270; // 8
-    }
-
-
-    private ArrayList<JSONObject> queryContentProvider(Context context, Uri collection, JSONObject columns, String whereClause) throws JSONException {
+        // TODO: filter
+        // https://stackoverflow.com/a/4495753
 
         final ArrayList<String> columnNames = new ArrayList<String>();
         final ArrayList<String> columnValues = new ArrayList<String>();
@@ -247,8 +155,7 @@ public class ListLibraryItems extends CordovaPlugin {
 
         final Cursor cursor = context.getContentResolver().query(
                 collection,
-                columnValues.toArray(new String[columns.length()]),
-                whereClause, null, sortOrder);
+                columnValues.toArray(new String[columns.length()]), "", null, sortOrder);
 
         final ArrayList<JSONObject> buffer = new ArrayList<JSONObject>();
 
@@ -283,8 +190,6 @@ public class ListLibraryItems extends CordovaPlugin {
         }
 
         cursor.close();
-
         return buffer;
-
     }
 }

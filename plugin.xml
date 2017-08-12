@@ -34,9 +34,9 @@
 	<platform name="android">
 		<config-file target="res/xml/config.xml" parent="/*">
 			<feature name="ListLibraryItems">
-				<param name="android-package" value="io.cozy.plugins.ListLibraryItems"/>
+				<param name="android-package" value="io.cozy.plugins.listlibraryitems.ListLibraryItems"/>
 			</feature>
 		</config-file>
-		<source-file src="src/android/io/cozy/plugins/ListLibraryItems.java" target-dir="src/io/cozy/plugins/"/>
+		<source-file src="src/android/io/cozy/plugins/listlibraryitems/ListLibraryItems.java" target-dir="src/io/cozy/plugins/listlibraryitems/"/>
 	</platform>
 </plugin>
