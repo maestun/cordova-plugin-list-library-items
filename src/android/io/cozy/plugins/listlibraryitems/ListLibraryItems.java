@@ -6,6 +6,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.media.ExifInterface;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.util.Log;
@@ -22,11 +23,17 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 // Needed only for fake API calls
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Authenticator;
 import java.net.HttpURLConnection;
+import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -36,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
+import static android.R.attr.password;
 
 public class ListLibraryItems extends CordovaPlugin {
 
@@ -83,6 +91,9 @@ public class ListLibraryItems extends CordovaPlugin {
             cordova.getThreadPool().execute(new Runnable() {
                 public void run() {
                     try {
+
+
+
                         uploadItem(callbackContext, args.getJSONObject(0));
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -236,121 +247,106 @@ public class ListLibraryItems extends CordovaPlugin {
     private boolean uploadItem(CallbackContext callbackContext, JSONObject aPayload) {
         String uploadUrl  = aPayload.optString("serverUrl");
         JSONObject headers = aPayload.optJSONObject("headers");
-        String libraryId  = aPayload.optString("libraryId");
-        String filePath   = aPayload.optString("filePath");
-
-
-        Log.i("Image filename", filePath);
-        Log.i("url", uploadUrl);
-        HttpURLConnection connection = null;
-        DataOutputStream outputStream = null;
-        // DataInputStream inputStream = null;
-
-        String lineEnd = "\r\n";
-        String twoHyphens = "--";
-        String boundary = "*****";
-        // DateFormat df = new SimpleDateFormat("yyyy_MM_dd_HH:mm:ss");
-
-        int bytesRead, bytesAvailable, bufferSize;
-        byte[] buffer;
-        final int MAX_BUFFER_SZ = 1 * 1024;
+        HttpURLConnection urlConnection = null;
         try {
-            FileInputStream fileInputStream = new FileInputStream(new File(filePath));
-            bytesAvailable = fileInputStream.available();
+
+            int bytesRead, bytesAvailable, bufferSize;
+            byte[] buffer;
+            final int MAX_BUFFER_SZ = 1 * 1024;
 
             URL url = new URL(uploadUrl);
-            connection = (HttpURLConnection) url.openConnection();
+            urlConnection = (HttpURLConnection) url.openConnection();
 
-            // Allow Inputs & Outputs
-            connection.setDoInput(true);
-            connection.setDoOutput(true);
-            connection.setUseCaches(false);
-            // connection.setChunkedStreamingMode(1024);
+            File file = new File(aPayload.optString("filePath"));
+            FileInputStream fis = new FileInputStream(file);
+            bytesAvailable = fis.available();
 
-            // Enable POST method
-            connection.setRequestMethod("POST");
 
-            // Custom headers
             Iterator<?> keys = headers.keys();
-            while(keys.hasNext() ){
-                String key = (String)keys.next();
+            while (keys.hasNext()) {
+                String key = (String) keys.next();
                 String val = headers.getString(key);
-                connection.setRequestProperty(key, val);
+                urlConnection.setRequestProperty(key, val);
             }
-            connection.setRequestProperty("Connection", "Keep-Alive");
+            urlConnection.setRequestProperty("Connection", "Keep-Alive");
+            urlConnection.setRequestProperty("Content-Length", "" + bytesAvailable);
 
-            String str = lineEnd + twoHyphens + boundary + twoHyphens + lineEnd;
-            long sz = bytesAvailable + str.length();
-            connection.setRequestProperty("Content-Length", "" + sz);
+            urlConnection.setUseCaches(false);
+            urlConnection.setDoInput(true);
+            urlConnection.setDoOutput(true);
+            //urlConnection.setChunkedStreamingMode(1024);
+            //urlConnection.setFixedLengthStreamingMode(bytesAvailable);
 
-            outputStream = new DataOutputStream(connection.getOutputStream());
-            // outputStream.writeBytes(twoHyphens + boundary + lineEnd);
+            Authenticator.setDefault(new Authenticator() {
+                protected PasswordAuthentication getPasswordAuthentication() {
+                    return new PasswordAuthentication("user", "pass".toCharArray());
+                }
+            });
 
-            // String connstr = "Content-Disposition: form-data; name=\"uploadedfile\";filename=\"" + filePath + "\"" + lineEnd;
-            // Log.i("Connstr", connstr);
-
-            // outputStream.writeBytes(connstr);
-            // outputStream.writeBytes(lineEnd);
+            OutputStream out = urlConnection.getOutputStream();
 
             bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
             buffer = new byte[bufferSize];
 
             // Read file
-            bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+            bytesRead = fis.read(buffer, 0, bufferSize);
             Log.i("Image length", bytesAvailable + "");
-            try {
-                while (bytesRead > 0) {
-                    try {
-                        outputStream.write(buffer, 0, bufferSize);
-                    } catch (OutOfMemoryError e) {
-                        e.printStackTrace();
-                        callbackContext.error(e.getMessage());
-                        return false;
-                    }
-                    bytesAvailable = fileInputStream.available();
-                    bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
-                    bytesRead = fileInputStream.read(buffer, 0, bufferSize);
-                    Log.i("Remaining", "bytes " + bytesAvailable);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-                callbackContext.error(e.getMessage());
-                return false;
+
+            while (bytesRead > 0) {
+                Log.i("Remaining", "write");
+                out.write(buffer, 0, bufferSize);
+                Log.i("Remaining", "avail");
+                bytesAvailable = fis.available();
+                Log.i("Remaining", "min");
+                bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
+                Log.i("Remaining", "read");
+                bytesRead = fis.read(buffer, 0, bufferSize);
+                Log.i("Remaining", "bytes " + bytesAvailable);
             }
 
+            out.close();
 
-            outputStream.writeBytes(lineEnd);
-            outputStream.writeBytes(twoHyphens + boundary + twoHyphens + lineEnd);
-
-
-
-            // Responses from the server (code and message)
-            int serverResponseCode = connection.getResponseCode();
-            String serverResponseMessage = connection.getResponseMessage();
+            int serverResponseCode = urlConnection.getResponseCode();
+            String serverResponseMessage = urlConnection.getResponseMessage();
             Log.i("Server Response Code ", "" + serverResponseCode);
             Log.i("Server Response Message", serverResponseMessage);
 
-            if (serverResponseCode >= 400) {
-                PluginResult pluginResult = new PluginResult(PluginResult.Status.ERROR, serverResponseMessage);
-                callbackContext.sendPluginResult(pluginResult);
-            }
-            else {
-                PluginResult pluginResult = new PluginResult(PluginResult.Status.OK);
-                callbackContext.sendPluginResult(pluginResult);
-            }
+        } catch (Exception e) {
+            Log.e("", e.getLocalizedMessage());
 
-            fileInputStream.close();
-            outputStream.flush();
-            outputStream.close();
-            // outputStream = null;
-        } catch (Exception ex) {
-            // Exception handling
-            Log.e("Send file Exception", ex.getMessage() + "");
-            callbackContext.error(ex.getMessage());
-            ex.printStackTrace();
+        } finally {
+            if(urlConnection != null) {
+               urlConnection.disconnect();
+            }
         }
-        return true;
 
+        return true;
     }
+
+
+
+        private class UploadFileTask extends AsyncTask<URL, Integer, String> {
+
+            @Override
+            protected void onPreExecute() {
+                super.onPreExecute();
+            }
+
+            @Override
+            protected String doInBackground(URL... urls) {
+                return null;
+            }
+
+            @Override
+            protected void onProgressUpdate(Integer... values) {
+                super.onProgressUpdate(values);
+            }
+
+
+            @Override
+            protected void onPostExecute(String s) {
+                super.onPostExecute(s);
+            }
+        }
 
 }
