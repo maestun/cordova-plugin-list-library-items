@@ -197,10 +197,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                 [item setObject:[NSNumber numberWithUnsignedInteger:[asset pixelHeight]] forKey:@"height"];
                 [item setObject:[self getMimeTypeFromPath:file_name] forKey:@"mimeType"];
                 [item setObject:[df stringFromDate:[asset creationDate]] forKey:@"creationDate"];
-                if([asset location]) {
-                    [item setObject:[asset localIdentifier] forKey:@"latitude"];
-                    [item setObject:[asset localIdentifier] forKey:@"longitude"];
-                }
+//                if([asset location]) {
+//                    [item setObject:[asset localIdentifier] forKey:@"latitude"];
+//                    [item setObject:[asset localIdentifier] forKey:@"longitude"];
+//                }
                 [items addObject:item];
             }
             
