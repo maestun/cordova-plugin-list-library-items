@@ -4,32 +4,28 @@ package io.cozy.plugins.listlibraryitems;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.media.ExifInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.SystemClock;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 
+import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
-import org.apache.cordova.CallbackContext;
-
 import org.apache.cordova.PluginResult;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-// Needed only for fake API calls
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Authenticator;
 import java.net.HttpURLConnection;
@@ -43,7 +39,8 @@ import java.util.Iterator;
 import java.util.List;
 
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
-import static android.R.attr.password;
+
+// Needed only for fake API calls
 
 public class ListLibraryItems extends CordovaPlugin {
 
@@ -91,10 +88,17 @@ public class ListLibraryItems extends CordovaPlugin {
             cordova.getThreadPool().execute(new Runnable() {
                 public void run() {
                     try {
+                        UploadFilePayload ufp = new UploadFilePayload();
+                        ufp.mJSONObject = args.getJSONObject(0);
+                        ufp.mCallbackContext = callbackContext;
+                       // new UploadFileTask().execute(ufp);
 
 
+                        String uploadUrl  = ufp.mJSONObject.optString("serverUrl");
+                        JSONObject headers = ufp.mJSONObject.optJSONObject("headers");
+                        String local = ufp.mJSONObject.optString("filePath");
 
-                        uploadItem(callbackContext, args.getJSONObject(0));
+                        sendFileToServer(local, uploadUrl);
                     } catch (Exception e) {
                         e.printStackTrace();
                         callbackContext.error(e.getMessage());
@@ -244,109 +248,244 @@ public class ListLibraryItems extends CordovaPlugin {
 
 
 
-    private boolean uploadItem(CallbackContext callbackContext, JSONObject aPayload) {
-        String uploadUrl  = aPayload.optString("serverUrl");
-        JSONObject headers = aPayload.optJSONObject("headers");
-        HttpURLConnection urlConnection = null;
-        try {
-
-            int bytesRead, bytesAvailable, bufferSize;
-            byte[] buffer;
-            final int MAX_BUFFER_SZ = 1 * 1024;
-
-            URL url = new URL(uploadUrl);
-            urlConnection = (HttpURLConnection) url.openConnection();
-
-            File file = new File(aPayload.optString("filePath"));
-            FileInputStream fis = new FileInputStream(file);
-            bytesAvailable = fis.available();
 
 
-            Iterator<?> keys = headers.keys();
-            while (keys.hasNext()) {
-                String key = (String) keys.next();
-                String val = headers.getString(key);
-                urlConnection.setRequestProperty(key, val);
-            }
-            urlConnection.setRequestProperty("Connection", "Keep-Alive");
-            urlConnection.setRequestProperty("Content-Length", "" + bytesAvailable);
 
-            urlConnection.setUseCaches(false);
-            urlConnection.setDoInput(true);
-            urlConnection.setDoOutput(true);
-            //urlConnection.setChunkedStreamingMode(1024);
-            //urlConnection.setFixedLengthStreamingMode(bytesAvailable);
+    private class UploadFilePayload {
+        protected CallbackContext mCallbackContext;
+        protected JSONObject mJSONObject;
+    }
 
-            Authenticator.setDefault(new Authenticator() {
-                protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication("user", "pass".toCharArray());
-                }
-            });
 
-            OutputStream out = urlConnection.getOutputStream();
+    private class UploadFileTask extends AsyncTask<UploadFilePayload, Integer, String> {
 
-            bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
-            buffer = new byte[bufferSize];
-
-            // Read file
-            bytesRead = fis.read(buffer, 0, bufferSize);
-            Log.i("Image length", bytesAvailable + "");
-
-            while (bytesRead > 0) {
-                Log.i("Remaining", "write");
-                out.write(buffer, 0, bufferSize);
-                Log.i("Remaining", "avail");
-                bytesAvailable = fis.available();
-                Log.i("Remaining", "min");
-                bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
-                Log.i("Remaining", "read");
-                bytesRead = fis.read(buffer, 0, bufferSize);
-                Log.i("Remaining", "bytes " + bytesAvailable);
-            }
-
-            out.close();
-
-            int serverResponseCode = urlConnection.getResponseCode();
-            String serverResponseMessage = urlConnection.getResponseMessage();
-            Log.i("Server Response Code ", "" + serverResponseCode);
-            Log.i("Server Response Message", serverResponseMessage);
-
-        } catch (Exception e) {
-            Log.e("", e.getLocalizedMessage());
-
-        } finally {
-            if(urlConnection != null) {
-               urlConnection.disconnect();
-            }
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
         }
 
-        return true;
+        @Override
+        protected String doInBackground(UploadFilePayload... uploadFilePayloads) {
+
+            JSONObject json = uploadFilePayloads[0].mJSONObject;
+            CallbackContext callback = uploadFilePayloads[0].mCallbackContext;
+
+            String uploadUrl  = json.optString("serverUrl");
+            JSONObject headers = json.optJSONObject("headers");
+            HttpURLConnection urlConnection = null;
+            try {
+
+                int bytesRead, bytesAvailable, bufferSize;
+                byte[] buffer;
+                final int MAX_BUFFER_SZ = 1 * 1024;
+
+                URL url = new URL(uploadUrl);
+                urlConnection = (HttpURLConnection) url.openConnection();
+
+                // get file sz
+                File file = new File(json.optString("filePath"));
+                FileInputStream fis = new FileInputStream(file);
+                bytesAvailable = fis.available();
+                final int FILE_SZ = bytesAvailable;
+
+                // custom headers
+                Iterator<?> keys = headers.keys();
+                while (keys.hasNext()) {
+                    String key = (String) keys.next();
+                    String val = headers.getString(key);
+                    urlConnection.setRequestProperty(key, val);
+                }
+                // urlConnection.setRequestProperty("Connection", "Keep-Alive");
+                urlConnection.setRequestProperty("Content-Length", "" + bytesAvailable);
+                urlConnection.setRequestProperty("User-Agent", System.getProperty("http.agent"));
+
+                // config
+                urlConnection.setUseCaches(false);
+                urlConnection.setDoInput(true);
+                urlConnection.setDoOutput(true);
+                urlConnection.setRequestMethod("POST");
+
+                // urlConnection.setChunkedStreamingMode(1024);
+                // urlConnection.setFixedLengthStreamingMode(bytesAvailable);
+
+                Authenticator.setDefault(new Authenticator() {
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication("user", "pass".toCharArray());
+                    }
+                });
+
+                OutputStream out = urlConnection.getOutputStream();
+                bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
+                buffer = new byte[bufferSize];
+
+                // Read file
+                bytesRead = fis.read(buffer, 0, bufferSize);
+
+                int total_bytes = bytesRead;
+                while (bytesRead > 0) {
+
+                    out.write(buffer, 0, bufferSize);
+                    bytesAvailable = fis.available();
+                    bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
+                    bytesRead = fis.read(buffer, 0, bufferSize);
+                    total_bytes += bytesRead;
+                    publishProgress(bufferSize, total_bytes, FILE_SZ);
+                }
+
+                out.flush();
+                out.close();
+
+                // InputStream is = urlConnection.getInputStream();
+
+                int serverResponseCode = urlConnection.getResponseCode();
+                String serverResponseMessage = urlConnection.getResponseMessage();
+                Log.i("Server Response Code ", "" + serverResponseCode);
+                Log.i("Server Response Message", serverResponseMessage);
+
+            } catch (Exception e) {
+                Log.e("", e.getLocalizedMessage());
+
+            } finally {
+                if(urlConnection != null) {
+                    urlConnection.disconnect();
+                }
+            }
+
+            return "";
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            super.onProgressUpdate(values);
+
+            Log.i("", "Wrote " + values[0] + " bytes (total: " + values[1] + " / " + values[2] + ")" );
+        }
+
+
+        @Override
+        protected void onPostExecute(String s) {
+            super.onPostExecute(s);
+        }
     }
 
 
 
-        private class UploadFileTask extends AsyncTask<URL, Integer, String> {
 
-            @Override
-            protected void onPreExecute() {
-                super.onPreExecute();
+
+    public String sendFileToServer(String filename, String targetUrl) {
+        String response = "error";
+        Log.e("Image filename", filename);
+        Log.e("url", targetUrl);
+        HttpURLConnection connection = null;
+        DataOutputStream outputStream = null;
+        // DataInputStream inputStream = null;
+
+        String pathToOurFile = filename;
+        String urlServer = targetUrl;
+        String lineEnd = "\r\n";
+        String twoHyphens = "--";
+        String boundary = "*****";
+        DateFormat df = new SimpleDateFormat("yyyy_MM_dd_HH:mm:ss");
+
+        int bytesRead, bytesAvailable, bufferSize;
+        byte[] buffer;
+        int maxBufferSize = 1 * 1024;
+        try {
+            FileInputStream fileInputStream = new FileInputStream(new File(
+                    pathToOurFile));
+
+            URL url = new URL(urlServer);
+            connection = (HttpURLConnection) url.openConnection();
+
+            // Allow Inputs & Outputs
+            connection.setDoInput(true);
+            connection.setDoOutput(true);
+            connection.setUseCaches(false);
+            connection.setChunkedStreamingMode(1024);
+            // Enable POST method
+            connection.setRequestMethod("POST");
+
+            connection.setRequestProperty("Connection", "Keep-Alive");
+            connection.setRequestProperty("Content-Type",
+                    "multipart/form-data;boundary=" + boundary);
+
+            outputStream = new DataOutputStream(connection.getOutputStream());
+            outputStream.writeBytes(twoHyphens + boundary + lineEnd);
+
+            String connstr = null;
+            connstr = "Content-Disposition: form-data; name=\"uploadedfile\";filename=\""
+                    + pathToOurFile + "\"" + lineEnd;
+            Log.i("Connstr", connstr);
+
+            outputStream.writeBytes(connstr);
+            outputStream.writeBytes(lineEnd);
+
+            bytesAvailable = fileInputStream.available();
+            bufferSize = Math.min(bytesAvailable, maxBufferSize);
+            buffer = new byte[bufferSize];
+
+            // Read file
+            bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+            Log.e("Image length", bytesAvailable + "");
+            try {
+                while (bytesRead > 0) {
+                    try {
+                        outputStream.write(buffer, 0, bufferSize);
+                    } catch (OutOfMemoryError e) {
+                        e.printStackTrace();
+                        response = "outofmemoryerror";
+                        return response;
+                    }
+                    bytesAvailable = fileInputStream.available();
+                    bufferSize = Math.min(bytesAvailable, maxBufferSize);
+                    bytesRead = fileInputStream.read(buffer, 0, bufferSize);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                response = "error";
+                return response;
+            }
+            outputStream.writeBytes(lineEnd);
+            outputStream.writeBytes(twoHyphens + boundary + twoHyphens
+                    + lineEnd);
+
+            // Responses from the server (code and message)
+            int serverResponseCode = connection.getResponseCode();
+            String serverResponseMessage = connection.getResponseMessage();
+            Log.i("Server Response Code ", "" + serverResponseCode);
+            Log.i("Server Response Message", serverResponseMessage);
+
+            if (serverResponseCode == 200) {
+                response = "true";
             }
 
-            @Override
-            protected String doInBackground(URL... urls) {
-                return null;
+            String CDate = null;
+            Date serverTime = new Date(connection.getDate());
+            try {
+                CDate = df.format(serverTime);
+            } catch (Exception e) {
+                e.printStackTrace();
+                Log.e("Date Exception", e.getMessage() + " Parse Exception");
             }
+            Log.i("Server Response Time", CDate + "");
 
-            @Override
-            protected void onProgressUpdate(Integer... values) {
-                super.onProgressUpdate(values);
-            }
+            filename = CDate
+                    + filename.substring(filename.lastIndexOf("."),
+                    filename.length());
+            Log.i("File Name in Server : ", filename);
 
-
-            @Override
-            protected void onPostExecute(String s) {
-                super.onPostExecute(s);
-            }
+            fileInputStream.close();
+            outputStream.flush();
+            outputStream.close();
+            outputStream = null;
+        } catch (Exception ex) {
+            // Exception handling
+            response = "error";
+            Log.e("Send file Exception", ex.getMessage() + "");
+            ex.printStackTrace();
         }
+        return response;
+    }
+
 
 }
