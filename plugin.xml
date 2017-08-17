@@ -3,7 +3,7 @@
 <plugin xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android" id="io.cozy.plugins.listlibraryitems" version="1.0.0">
 	<name>Library Items List Plugin</name>
 	<description>
-		Plugin to list the phone's library items (pictures, videos, audio...)
+		List and Upload phone's library items (pics, videos...)
 	</description>
 
 	<license>AGPL v3</license>
