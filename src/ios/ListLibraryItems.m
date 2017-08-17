@@ -10,6 +10,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 @interface ListLibraryItems () {
     CDVInvokedUrlCommand * mCommand;
     NSURL * mLocalTempURL;
+    NSDictionary * mReceivedData;
 }
 
 @end
@@ -79,11 +80,11 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 }
 
 
-- (void)returnUploadResult:(BOOL)aAuthorized message:(NSString *)aMessage command:(CDVInvokedUrlCommand *)aCommand {
-    CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-    if(aAuthorized == NO) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:aMessage];
+- (void)returnUploadResult:(BOOL)aSuccess payload:(NSDictionary *)aJSON command:(CDVInvokedUrlCommand *)aCommand {
+    if(aJSON == nil) {
+        aJSON = [NSDictionary dictionary];
     }
+    CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:(aSuccess ? CDVCommandStatus_OK : CDVCommandStatus_ERROR) messageAsDictionary:aJSON];
     [[self commandDelegate] sendPluginResult:pluginResult callbackId:[aCommand callbackId]];
 }
 
@@ -92,18 +93,17 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     
     NSDictionary * payload = command.arguments[0];
     NSString * uploadUrl  = payload[@"serverUrl"];
-//    NSString * filePath  = payload[@"filePath"];
     NSDictionary * headers = payload[@"headers"];
-//    NSDictionary * parameters = payload[@"parameters"];
     NSString * libraryId = payload[@"libraryId"];
-//    NSString * fileId = payload[@"id"];
     
     
     // try to fetch asset
     PHFetchResult<PHAsset *> * assets = [PHAsset fetchAssetsWithLocalIdentifiers:@[libraryId] options:kNilOptions];
     if([assets count] == 0) {
         // asset id not found
-        [self returnUploadResult:NO message:[NSString stringWithFormat:@"Cannot fetch asset %@", libraryId] command:command];
+        NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@", libraryId];
+        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
+        [self returnUploadResult:NO payload:json command:command];
     }
     else {
         for(PHAsset * asset in assets) {
@@ -119,7 +119,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             
             [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
                 if (aError) {
-                    [self returnUploadResult:NO message:[NSString stringWithFormat:@"Cannot fetch asset %@", libraryId] command:command];
+                    
+                    NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@", libraryId];
+                    NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
+                    [self returnUploadResult:NO payload:json command:command];
                 }
                 else {
                     NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
@@ -267,16 +270,25 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     
     // cleanup
     [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil];
-    if(error && status >= 400) {
+    NSString * target = [[[task originalRequest] URL] relativeString];
+    if(error && (status / 100) != 2) {
         NSLog(@"Error: %@", error);
-        [self returnUploadResult:NO message:[NSString stringWithFormat:@"upload error: %@", [error localizedDescription]] command:mCommand];
+        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], [error localizedDescription], mLocalTempURL, target]
+                                                                        forKeys:@[@"code", @"message", @"source", @"target"]];
+        [self returnUploadResult:NO payload:json command:mCommand];
+        
     } else {
         NSLog(@"--- UPLOAD OK ---");
         NSLog(@"%@", response);
-        [self returnUploadResult:YES message:@"" command:mCommand];
+        [self returnUploadResult:YES payload:mReceivedData command:mCommand];
     }
 }
-
+- (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data {
+    id json =[NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:nil];
+    if([json isKindOfClass:[NSDictionary class]]) {
+        mReceivedData = (NSDictionary *)json;
+    }
+}
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task needNewBodyStream:(nonnull void (^)(NSInputStream * _Nullable))completionHandler {
     NSLog(@"needNewBodyStream");
 }

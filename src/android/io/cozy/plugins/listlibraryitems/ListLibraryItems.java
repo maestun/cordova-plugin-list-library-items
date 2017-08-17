@@ -258,12 +258,12 @@ public class ListLibraryItems extends CordovaPlugin {
             JSONObject json = uploadFilePayloads[0].mJSONObject;
             mCallback = uploadFilePayloads[0].mCallbackContext;
 
+            String file_path = json.optString("filePath");
+            String upload_url  = json.optString("serverUrl");
+            JSONObject headers = json.optJSONObject("headers");
             HttpURLConnection huc = null;
             try {
                 // retrieve params from JS
-                String file_path = json.optString("filePath");
-                String upload_url  = json.optString("serverUrl");
-                JSONObject headers = json.optJSONObject("headers");
 
                 int bytes_read, bytes_available, buffer_size, total_bytes;
                 byte[] buffer;
@@ -324,7 +324,13 @@ public class ListLibraryItems extends CordovaPlugin {
                 // back to JS
                 if(response_code / 100 != 2) {
                     // error
-                    PluginResult pr = new PluginResult(PluginResult.Status.ERROR, response_message);
+                    JSONObject json_error = new JSONObject();
+                    json_error.put("code", response_code);
+                    json_error.put("source", file_path);
+                    json_error.put("target", upload_url);
+                    json_error.put("message", response_message);
+
+                    PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                     mCallback.sendPluginResult(pr);
                 }
                 else {
@@ -342,7 +348,17 @@ public class ListLibraryItems extends CordovaPlugin {
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                PluginResult pr = new PluginResult(PluginResult.Status.ERROR, e.getLocalizedMessage());
+                JSONObject json_error = new JSONObject();
+                try {
+                    json_error.put("code", -1);
+                    json_error.put("source", file_path);
+                    json_error.put("target", upload_url);
+                    json_error.put("message", e.getLocalizedMessage());
+                }
+                catch (JSONException ex) {
+
+                }
+                PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                 mCallback.sendPluginResult(pr);
             } finally {
                 if(huc != null) {
