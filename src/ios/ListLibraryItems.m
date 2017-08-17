@@ -119,13 +119,19 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             
             [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
                 if (aError) {
-                    
+                    // cannot fetch asset
                     NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@", libraryId];
                     NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
                     [self returnUploadResult:NO payload:json command:command];
                 }
                 else {
-                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
+                    
+                    // create upload session
+                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:libraryId];
+                    [config setDiscretionary:YES]; // iOS will perform background upload when better suited
+                    [config setSessionSendsLaunchEvents:YES]; // launch app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
+                    
+//                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
                     NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
 
                     NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
@@ -276,9 +282,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], [error localizedDescription], mLocalTempURL, target]
                                                                         forKeys:@[@"code", @"message", @"source", @"target"]];
         [self returnUploadResult:NO payload:json command:mCommand];
-        
     } else {
-        NSLog(@"--- UPLOAD OK ---");
+        NSLog(@"--- STATUS OK ---");
         NSLog(@"%@", response);
         [self returnUploadResult:YES payload:mReceivedData command:mCommand];
     }
