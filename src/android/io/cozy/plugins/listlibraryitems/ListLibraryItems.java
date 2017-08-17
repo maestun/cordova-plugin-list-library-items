@@ -1,5 +1,3 @@
-// TODO comments, header
-
 package io.cozy.plugins.listlibraryitems;
 
 import android.content.Context;
@@ -40,8 +38,6 @@ import java.util.List;
 
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 
-// Needed only for fake API calls
-
 public class ListLibraryItems extends CordovaPlugin {
 
     private Context mContext;
@@ -52,10 +48,9 @@ public class ListLibraryItems extends CordovaPlugin {
     @Override
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
-        // Plugin specific one off initialization code here, this one doesn't
-        // have any
         mContext = this.cordova.getActivity().getApplicationContext();
     }
+
 
     @Override
     public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException {
@@ -76,7 +71,6 @@ public class ListLibraryItems extends CordovaPlugin {
                         else {
                             listItems(callbackContext, args.getBoolean(0), args.getBoolean(1), args.getBoolean(2));
                         }
-
                     } catch (Exception e) {
                         e.printStackTrace();
                         callbackContext.error(e.getMessage());
@@ -92,13 +86,6 @@ public class ListLibraryItems extends CordovaPlugin {
                         ufp.mJSONObject = args.getJSONObject(0);
                         ufp.mCallbackContext = callbackContext;
                         new UploadFileTask().execute(ufp);
-
-/*
-                        String uploadUrl  = ufp.mJSONObject.optString("serverUrl");
-                        JSONObject headers = ufp.mJSONObject.optJSONObject("headers");
-                        String local = ufp.mJSONObject.optString("filePath");
-                        sendFileToServer(local, uploadUrl);
-                        */
                     } catch (Exception e) {
                         e.printStackTrace();
                         callbackContext.error(e.getMessage());
@@ -247,17 +234,15 @@ public class ListLibraryItems extends CordovaPlugin {
     }
 
 
-
-
-
-
     private class UploadFilePayload {
         protected CallbackContext mCallbackContext;
         protected JSONObject mJSONObject;
     }
 
 
-    private class UploadFileTask extends AsyncTask<UploadFilePayload, Integer, String> {
+    private class UploadFileTask extends AsyncTask<UploadFilePayload, Integer, Integer> {
+
+        private CallbackContext mCallback;
 
         @Override
         protected void onPreExecute() {
@@ -265,97 +250,106 @@ public class ListLibraryItems extends CordovaPlugin {
         }
 
         @Override
-        protected String doInBackground(UploadFilePayload... uploadFilePayloads) {
+        protected Integer doInBackground(UploadFilePayload... uploadFilePayloads) {
+
+            final int MAX_BUFFER_SZ = 1 * 1024;
+            Integer response_code = 0;
 
             JSONObject json = uploadFilePayloads[0].mJSONObject;
-            CallbackContext callback = uploadFilePayloads[0].mCallbackContext;
+            mCallback = uploadFilePayloads[0].mCallbackContext;
 
-            String uploadUrl  = json.optString("serverUrl");
-            JSONObject headers = json.optJSONObject("headers");
-            HttpURLConnection urlConnection = null;
+            HttpURLConnection huc = null;
             try {
+                // retrieve params from JS
+                String file_path = json.optString("filePath");
+                String upload_url  = json.optString("serverUrl");
+                JSONObject headers = json.optJSONObject("headers");
 
-                int bytesRead, bytesAvailable, bufferSize;
+                int bytes_read, bytes_available, buffer_size, total_bytes;
                 byte[] buffer;
-                final int MAX_BUFFER_SZ = 1 * 1024;
+                huc = (HttpURLConnection)new URL(upload_url).openConnection();
 
-                URL url = new URL(uploadUrl);
-                urlConnection = (HttpURLConnection) url.openConnection();
 
                 // get file sz
-                File file = new File(json.optString("filePath"));
+                File file = new File(file_path);
                 FileInputStream fis = new FileInputStream(file);
-                bytesAvailable = fis.available();
-                final int FILE_SZ = bytesAvailable;
+                bytes_available = fis.available();
+                final int FILE_SZ = bytes_available;
 
 
-                // custom headers
+                // set custom headers
                 Iterator<?> keys = headers.keys();
                 while (keys.hasNext()) {
                     String key = (String) keys.next();
                     String val = headers.getString(key);
-                    urlConnection.setRequestProperty(key, val);
+                    huc.setRequestProperty(key, val);
                 }
                 // urlConnection.setRequestProperty("Connection", "Keep-Alive");
-                urlConnection.setRequestProperty("Content-Length", "" + bytesAvailable);
-                urlConnection.setRequestProperty("User-Agent", System.getProperty("http.agent"));
+                huc.setRequestProperty("Content-Length", "" + FILE_SZ);
+                huc.setRequestProperty("User-Agent", System.getProperty("http.agent"));
 
 
-                // config
-                urlConnection.setUseCaches(false);
-                urlConnection.setDoInput(true);
-                urlConnection.setDoOutput(true);
-                urlConnection.setRequestMethod("POST");
+                // config request
+                huc.setUseCaches(false);
+                huc.setDoInput(true);
+                huc.setDoOutput(true);
+                huc.setRequestMethod("POST");
                 // urlConnection.setInstanceFollowRedirects(false);
-
-                // urlConnection.setChunkedStreamingMode(1024);
+                huc.setChunkedStreamingMode(1024);
                 // urlConnection.setFixedLengthStreamingMode(bytesAvailable);
 
-                Authenticator.setDefault(new Authenticator() {
-                    protected PasswordAuthentication getPasswordAuthentication() {
-                        return new PasswordAuthentication("user", "pass".toCharArray());
-                    }
-                });
 
-                OutputStream out = urlConnection.getOutputStream();
-                bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
-                buffer = new byte[bufferSize];
-
-                // Read file
-                bytesRead = fis.read(buffer, 0, bufferSize);
-
-                int total_bytes = bytesRead;
-                while (bytesRead > 0) {
-
-                    out.write(buffer, 0, bufferSize);
-                    bytesAvailable = fis.available();
-                    bufferSize = Math.min(bytesAvailable, MAX_BUFFER_SZ);
-                    bytesRead = fis.read(buffer, 0, bufferSize);
-                    total_bytes += bytesRead;
-                    publishProgress(bufferSize, total_bytes, FILE_SZ);
+                // read input file chunks + publish progress
+                OutputStream out = huc.getOutputStream();
+                buffer_size = Math.min(bytes_available, MAX_BUFFER_SZ);
+                buffer = new byte[buffer_size];
+                bytes_read = fis.read(buffer, 0, buffer_size);
+                total_bytes = bytes_read;
+                while (bytes_read > 0) {
+                    out.write(buffer, 0, buffer_size);
+                    bytes_available = fis.available();
+                    buffer_size = Math.min(bytes_available, MAX_BUFFER_SZ);
+                    bytes_read = fis.read(buffer, 0, buffer_size);
+                    total_bytes += bytes_read;
+                    publishProgress(buffer_size, total_bytes, FILE_SZ);
                 }
-
                 out.flush();
                 out.close();
 
 
+                // get server response
+                response_code = huc.getResponseCode();
+                String response_message = huc.getResponseMessage();
 
-                int serverResponseCode = urlConnection.getResponseCode();
-                String serverResponseMessage = urlConnection.getResponseMessage();
-                Log.i("Server Response Code ", "" + serverResponseCode);
-                Log.i("Server Response Message", serverResponseMessage);
-
-                // InputStream is = urlConnection.getInputStream();
+                // back to JS
+                if(response_code / 100 != 2) {
+                    // error
+                    PluginResult pr = new PluginResult(PluginResult.Status.ERROR, response_message);
+                    mCallback.sendPluginResult(pr);
+                }
+                else {
+                    // ok
+                    InputStream is = huc.getInputStream();
+                    StringBuilder sb = new StringBuilder();
+                    BufferedReader br = new BufferedReader(new InputStreamReader(is));
+                    String read;
+                    while((read = br.readLine()) != null) {
+                        sb.append(read);
+                    }
+                    br.close();
+                    PluginResult pr = new PluginResult(PluginResult.Status.OK, sb.toString());
+                    mCallback.sendPluginResult(pr);
+                }
             } catch (Exception e) {
-                Log.e("", e.getLocalizedMessage());
-
+                e.printStackTrace();
+                PluginResult pr = new PluginResult(PluginResult.Status.ERROR, e.getLocalizedMessage());
+                mCallback.sendPluginResult(pr);
             } finally {
-                if(urlConnection != null) {
-                    urlConnection.disconnect();
+                if(huc != null) {
+                    huc.disconnect();
                 }
             }
-
-            return "";
+            return response_code;
         }
 
         @Override
@@ -363,13 +357,14 @@ public class ListLibraryItems extends CordovaPlugin {
             super.onProgressUpdate(values);
 
             Log.i("", "Wrote " + values[0] + " bytes (total: " + values[1] + " / " + values[2] + ")" );
+
+            // TODO: send progress
         }
 
 
         @Override
-        protected void onPostExecute(String s) {
-            super.onPostExecute(s);
+        protected void onPostExecute(Integer aResponseCode) {
+            super.onPostExecute(aResponseCode);
         }
     }
-
 }
