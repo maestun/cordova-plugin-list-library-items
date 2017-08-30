@@ -95,7 +95,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSString * uploadUrl  = payload[@"serverUrl"];
     NSDictionary * headers = payload[@"headers"];
     NSString * libraryId = payload[@"libraryId"];
-    
+	
+    mCommand = command;
     
     // try to fetch asset
     PHFetchResult<PHAsset *> * assets = [PHAsset fetchAssetsWithLocalIdentifiers:@[libraryId] options:kNilOptions];
