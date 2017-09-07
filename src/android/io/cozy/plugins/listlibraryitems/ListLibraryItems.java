@@ -7,6 +7,7 @@ import android.os.AsyncTask;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
+import android.content.pm.PackageManager;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -41,6 +42,7 @@ import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 public class ListLibraryItems extends CordovaPlugin {
 
     private Context mContext;
+    private CallbackContext mCallbackContext;
     private static final String PERMISSION_ERROR = "Permission Denial: This application is not allowed to access Photo data.";
     private SimpleDateFormat mDateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
@@ -54,7 +56,8 @@ public class ListLibraryItems extends CordovaPlugin {
 
     @Override
     public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException {
-
+        mCallbackContext = callbackContext;
+        
         if ("isAuthorized".equals(action)) {
             this.isAuthorized(callbackContext);
             return true;
@@ -118,6 +121,19 @@ public class ListLibraryItems extends CordovaPlugin {
             e.printStackTrace();
             callbackContext.error(e.getMessage());
         }
+    }
+  
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
+        for(int r:grantResults)
+        {
+            if(r == PackageManager.PERMISSION_DENIED)
+            {
+                this.mCallbackContext.error("Permission denied");
+                return;
+            }
+        }
+        
+        this.mCallbackContext.success();
     }
 
     private boolean listItems(CallbackContext callbackContext, boolean includePictures, boolean includeVideos, boolean includeCloud) {
