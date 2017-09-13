@@ -190,16 +190,21 @@ public class ListLibraryItems extends CordovaPlugin {
 
         while (iteratorFields.hasNext()) {
             String column = iteratorFields.next();
-
             columnNames.add(column);
             columnValues.add("" + columns.getString(column));
         }
 
+        // https://stackoverflow.com/a/20429397
+        final String selection = MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " = ?";
+        final String[] selectionArgs = new String[] {
+            "Camera"
+        };
+        
         final String sortOrder = MediaStore.Images.Media.DATE_TAKEN;
 
         final Cursor cursor = context.getContentResolver().query(
                 collection,
-                columnValues.toArray(new String[columns.length()]), "", null, sortOrder);
+                columnValues.toArray(new String[columns.length()]), selection, selectionArgs, sortOrder);
 
         final ArrayList<JSONObject> buffer = new ArrayList<JSONObject>();
 
