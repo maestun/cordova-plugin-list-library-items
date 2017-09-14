@@ -282,6 +282,10 @@ public class ListLibraryItems extends CordovaPlugin {
             String file_path = json.optString("filePath");
             String upload_url  = json.optString("serverUrl");
             JSONObject headers = json.optJSONObject("headers");
+            
+            // TODO: a better solution might be to force "https" into JS code / getClientUrl()
+            upload_url = upload_url.replace("http://", "https://");
+            
             HttpURLConnection huc = null;
             try {
                 // retrieve params from JS
