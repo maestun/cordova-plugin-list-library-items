@@ -280,7 +280,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSString * target = [[[task originalRequest] URL] relativeString];
     if(error && (status / 100) != 2) {
         NSLog(@"Error: %@", error);
-        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], [error localizedDescription], mLocalTempURL, target]
+        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], [error localizedDescription], [mLocalTempURL absoluteString], target]
                                                                         forKeys:@[@"code", @"message", @"source", @"target"]];
         [self returnUploadResult:NO payload:json command:mCommand];
     } else {
