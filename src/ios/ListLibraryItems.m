@@ -96,9 +96,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSDictionary * headers = payload[@"headers"];
     NSString * libraryId = payload[@"libraryId"];
 	
-    // TODO: a better solution might be to force "https" into JS code / getClientUrl()
-    uploadUrl = [uploadUrl stringByReplacingOccurrencesOfString:@"http://" withString:@"https://"];
-    
     mCommand = command;
     
     // try to fetch asset
