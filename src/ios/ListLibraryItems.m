@@ -290,9 +290,14 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
 }
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data {
-    id json =[NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:nil];
-    if([json isKindOfClass:[NSDictionary class]]) {
-        mReceivedData = (NSDictionary *)json;
+    if (data == nil) {
+        mReceivedData = [NSMutableDictionary dictionary];
+    }
+    else {
+        id json =[NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:nil];
+        if([json isKindOfClass:[NSDictionary class]]) {
+            mReceivedData = (NSDictionary *)json;
+        }
     }
 }
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task needNewBodyStream:(nonnull void (^)(NSInputStream * _Nullable))completionHandler {
