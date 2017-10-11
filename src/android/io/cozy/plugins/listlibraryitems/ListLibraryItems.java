@@ -316,7 +316,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 huc.setDoOutput(true);
                 huc.setRequestMethod("POST");
                 // urlConnection.setInstanceFollowRedirects(false);
-                huc.setChunkedStreamingMode(1024);
+                huc.setChunkedStreamingMode(1024 * 1000);
                 // urlConnection.setFixedLengthStreamingMode(bytesAvailable);
 
 
