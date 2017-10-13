@@ -121,7 +121,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
                 if (aError) {
                     // cannot fetch asset
-                    NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@", libraryId];
+                    NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@ (%@)", libraryId, [aError localizedDescription]];
                     NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
                     [self returnUploadResult:NO payload:json command:command];
                 }
