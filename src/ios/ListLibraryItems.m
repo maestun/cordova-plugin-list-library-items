@@ -113,7 +113,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             mLocalTempURL = [NSURL fileURLWithPath:temp_path];
             [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil]; // cleanup
             PHAssetResourceRequestOptions * options = [PHAssetResourceRequestOptions new];
-            [options setNetworkAccessAllowed: NO];
+            [options setNetworkAccessAllowed: YES];
             [options setProgressHandler:^(double progress) {
                 NSLog(@"progress %f", progress);
             }];
