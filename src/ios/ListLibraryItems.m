@@ -278,9 +278,18 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     // cleanup
     [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil];
     NSString * target = [[[task originalRequest] URL] relativeString];
-    if(error && (status / 100) != 2) {
+    if(error || (status / 100) != 2) {
+        NSString * errorMessage;
+        
+        if (error) {
+            NSLog(@"Error: %@", error);
+            errorMessage = [error localizedDescription];
+        }
+        else {
+            errorMessage = [NSHTTPURLResponse localizedStringForStatusCode:status];
+        }
         NSLog(@"Error: %@", error);
-        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], [error localizedDescription], [mLocalTempURL absoluteString], target]
+        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], errorMessage, [mLocalTempURL absoluteString], target]
                                                                         forKeys:@[@"code", @"message", @"source", @"target"]];
         [self returnUploadResult:NO payload:json command:mCommand];
     } else {
