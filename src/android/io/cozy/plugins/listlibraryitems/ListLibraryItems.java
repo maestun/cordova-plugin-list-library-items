@@ -326,7 +326,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 buffer = new byte[buffer_size];
                 bytes_read = fis.read(buffer, 0, buffer_size);
                 total_bytes = bytes_read;
-                while (bytes_read > 0 && huc.getErrorStream() == null) {
+                while (bytes_read > 0) {
                     out.write(buffer, 0, buffer_size);
                     bytes_available = fis.available();
                     buffer_size = Math.min(bytes_available, MAX_BUFFER_SZ);
