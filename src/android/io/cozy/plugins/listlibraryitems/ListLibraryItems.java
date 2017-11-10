@@ -374,7 +374,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     json_error.put("code", -1);
                     json_error.put("source", file_path);
                     json_error.put("target", upload_url);
-                    json_error.put("message", e.getLocalizedMessage());
+                    json_error.put("message", e.toString());
                 }
                 catch (JSONException ex) {
 
