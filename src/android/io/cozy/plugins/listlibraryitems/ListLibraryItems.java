@@ -46,18 +46,17 @@ public class ListLibraryItems extends CordovaPlugin {
     private static final String PERMISSION_ERROR = "Permission Denial: This application is not allowed to access Photo data.";
     private SimpleDateFormat mDateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
-
     @Override
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         mContext = this.cordova.getActivity().getApplicationContext();
     }
 
-
     @Override
-    public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext) throws JSONException {
+    public boolean execute(String action, final JSONArray args, final CallbackContext callbackContext)
+            throws JSONException {
         mCallbackContext = callbackContext;
-        
+
         if ("isAuthorized".equals(action)) {
             this.isAuthorized(callbackContext);
             return true;
@@ -70,8 +69,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     try {
                         if (!cordova.hasPermission(READ_EXTERNAL_STORAGE)) {
                             callbackContext.error(PERMISSION_ERROR);
-                        }
-                        else {
+                        } else {
                             listItems(callbackContext, args.getBoolean(0), args.getBoolean(1), args.getBoolean(2));
                         }
                     } catch (Exception e) {
@@ -101,12 +99,10 @@ public class ListLibraryItems extends CordovaPlugin {
         return false;
     }
 
-
     private void isAuthorized(CallbackContext callbackContext) {
         boolean ok = cordova.hasPermission(READ_EXTERNAL_STORAGE);
         callbackContext.success(ok ? 1 : 0);
     }
-
 
     private void requestReadAuthorization(CallbackContext callbackContext) {
         try {
@@ -122,45 +118,51 @@ public class ListLibraryItems extends CordovaPlugin {
             callbackContext.error(e.getMessage());
         }
     }
-  
-    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) throws JSONException {
-        for(int r:grantResults)
-        {
-            if(r == PackageManager.PERMISSION_DENIED)
-            {
+
+    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults)
+            throws JSONException {
+        for (int r : grantResults) {
+            if (r == PackageManager.PERMISSION_DENIED) {
                 this.mCallbackContext.error("Permission denied");
                 return;
             }
         }
-        
+
         this.mCallbackContext.success();
     }
 
-    private boolean listItems(CallbackContext callbackContext, boolean includePictures, boolean includeVideos, boolean includeCloud) {
+    private boolean listItems(CallbackContext callbackContext, boolean includePictures, boolean includeVideos,
+            boolean includeCloud) {
         try {
             // All columns here: https://developer.android.com/reference/android/provider/MediaStore.Images.ImageColumns.html,
             // https://developer.android.com/reference/android/provider/MediaStore.MediaColumns.html
-            JSONObject columns = new JSONObject() {{
-                put("int.id", MediaStore.Images.Media._ID);
-                put("fileName", MediaStore.Images.ImageColumns.DISPLAY_NAME);
-                put("int.width", MediaStore.Images.ImageColumns.WIDTH);
-                put("int.height", MediaStore.Images.ImageColumns.HEIGHT);
-                put("libraryId", MediaStore.Images.ImageColumns.BUCKET_ID);
-                put("date.creationDate", MediaStore.Images.ImageColumns.DATE_TAKEN);
-                // put("float.latitude", MediaStore.Images.ImageColumns.LATITUDE);
-                // put("float.longitude", MediaStore.Images.ImageColumns.LONGITUDE);
-                put("filePath", MediaStore.MediaColumns.DATA);
-            }};
+            JSONObject columns = new JSONObject() {
+                {
+                    put("int.id", MediaStore.Images.Media._ID);
+                    put("fileName", MediaStore.Images.ImageColumns.DISPLAY_NAME);
+                    put("int.width", MediaStore.Images.ImageColumns.WIDTH);
+                    put("int.height", MediaStore.Images.ImageColumns.HEIGHT);
+                    put("libraryId", MediaStore.Images.ImageColumns.BUCKET_ID);
+                    put("date.creationDate", MediaStore.Images.ImageColumns.DATE_TAKEN);
+                    // put("float.latitude", MediaStore.Images.ImageColumns.LATITUDE);
+                    // put("float.longitude", MediaStore.Images.ImageColumns.LONGITUDE);
+                    put("filePath", MediaStore.MediaColumns.DATA);
+                }
+            };
 
             final ArrayList<JSONObject> queryResults = new ArrayList();
 
-            if(includePictures) {
-                queryResults.addAll(queryContentProvider(mContext, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columns));
-                queryResults.addAll(queryContentProvider(mContext, MediaStore.Images.Media.INTERNAL_CONTENT_URI, columns));
+            if (includePictures) {
+                queryResults
+                        .addAll(queryContentProvider(mContext, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columns));
+                queryResults
+                        .addAll(queryContentProvider(mContext, MediaStore.Images.Media.INTERNAL_CONTENT_URI, columns));
             }
-            if(includeVideos) {
-                queryResults.addAll(queryContentProvider(mContext, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, columns));
-                queryResults.addAll(queryContentProvider(mContext, MediaStore.Video.Media.INTERNAL_CONTENT_URI, columns));
+            if (includeVideos) {
+                queryResults
+                        .addAll(queryContentProvider(mContext, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, columns));
+                queryResults
+                        .addAll(queryContentProvider(mContext, MediaStore.Video.Media.INTERNAL_CONTENT_URI, columns));
             }
 
             JSONObject result = new JSONObject();
@@ -177,8 +179,8 @@ public class ListLibraryItems extends CordovaPlugin {
         }
     }
 
-
-    private ArrayList<JSONObject> queryContentProvider(Context context, Uri collection, JSONObject columns) throws Exception {
+    private ArrayList<JSONObject> queryContentProvider(Context context, Uri collection, JSONObject columns)
+            throws Exception {
 
         // TODO: filter
         // https://stackoverflow.com/a/4495753
@@ -196,14 +198,11 @@ public class ListLibraryItems extends CordovaPlugin {
 
         // https://stackoverflow.com/a/20429397
         final String selection = MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " = ?";
-        final String[] selectionArgs = new String[] {
-            "Camera"
-        };
-        
+        final String[] selectionArgs = new String[] { "Camera" };
+
         final String sortOrder = MediaStore.Images.Media.DATE_TAKEN;
 
-        final Cursor cursor = context.getContentResolver().query(
-                collection,
+        final Cursor cursor = context.getContentResolver().query(collection,
                 columnValues.toArray(new String[columns.length()]), selection, selectionArgs, sortOrder);
 
         final ArrayList<JSONObject> buffer = new ArrayList<JSONObject>();
@@ -236,14 +235,12 @@ public class ListLibraryItems extends CordovaPlugin {
 
                 // TODO: return partial result
 
-            }
-            while (cursor.moveToNext());
+            } while (cursor.moveToNext());
         }
 
         cursor.close();
         return buffer;
     }
-
 
     private static String getMimeType(String url) {
         String type = null;
@@ -254,12 +251,10 @@ public class ListLibraryItems extends CordovaPlugin {
         return type;
     }
 
-
     private class UploadFilePayload {
         protected CallbackContext mCallbackContext;
         protected JSONObject mJSONObject;
     }
-
 
     private class UploadFileTask extends AsyncTask<UploadFilePayload, Integer, Integer> {
 
@@ -273,14 +268,14 @@ public class ListLibraryItems extends CordovaPlugin {
         @Override
         protected Integer doInBackground(UploadFilePayload... uploadFilePayloads) {
 
-            final int MAX_BUFFER_SZ = 1 * 1024;
+            final int MAX_BUFFER_SZ = 1024;
             Integer response_code = 0;
 
             JSONObject json = uploadFilePayloads[0].mJSONObject;
             mCallback = uploadFilePayloads[0].mCallbackContext;
 
             String file_path = json.optString("filePath");
-            String upload_url  = json.optString("serverUrl");
+            String upload_url = json.optString("serverUrl");
             JSONObject headers = json.optJSONObject("headers");
             HttpURLConnection huc = null;
             try {
@@ -288,8 +283,7 @@ public class ListLibraryItems extends CordovaPlugin {
 
                 int bytes_read, bytes_available, buffer_size, total_bytes;
                 byte[] buffer;
-                huc = (HttpURLConnection)new URL(upload_url).openConnection();
-
+                huc = (HttpURLConnection) new URL(upload_url).openConnection();
 
                 // get file sz
                 File file = new File(file_path);
@@ -304,21 +298,16 @@ public class ListLibraryItems extends CordovaPlugin {
                     String val = headers.getString(key);
                     huc.setRequestProperty(key, val);
                 }
-                // urlConnection.setRequestProperty("Connection", "Keep-Alive");
                 huc.setRequestProperty("Content-Length", "" + FILE_SZ);
                 huc.setRequestProperty("User-Agent", System.getProperty("http.agent"));
-
 
                 // config request
                 huc.setUseCaches(false);
                 huc.setDoInput(true);
                 huc.setDoOutput(true);
                 huc.setRequestMethod("POST");
-                // urlConnection.setInstanceFollowRedirects(false);
                 huc.setChunkedStreamingMode(1024 * 1000);
                 huc.setInstanceFollowRedirects(true);
-                // urlConnection.setFixedLengthStreamingMode(bytesAvailable);
-
 
                 // read input file chunks + publish progress
                 OutputStream out = huc.getOutputStream();
@@ -333,13 +322,12 @@ public class ListLibraryItems extends CordovaPlugin {
                 out.flush();
                 out.close();
 
-
                 // get server response
                 response_code = huc.getResponseCode();
                 String response_message = huc.getResponseMessage();
 
                 // back to JS
-                if(response_code / 100 != 2) {
+                if (response_code / 100 != 2) {
                     // error
                     JSONObject json_error = new JSONObject();
                     json_error.put("code", response_code);
@@ -349,14 +337,13 @@ public class ListLibraryItems extends CordovaPlugin {
 
                     PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                     mCallback.sendPluginResult(pr);
-                }
-                else {
+                } else {
                     // ok
                     InputStream is = huc.getInputStream();
                     StringBuilder sb = new StringBuilder();
                     BufferedReader br = new BufferedReader(new InputStreamReader(is));
                     String read;
-                    while((read = br.readLine()) != null) {
+                    while ((read = br.readLine()) != null) {
                         sb.append(read);
                     }
                     br.close();
@@ -371,14 +358,13 @@ public class ListLibraryItems extends CordovaPlugin {
                     json_error.put("source", file_path);
                     json_error.put("target", upload_url);
                     json_error.put("message", e.toString());
-                }
-                catch (JSONException ex) {
+                } catch (JSONException ex) {
 
                 }
                 PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                 mCallback.sendPluginResult(pr);
             } finally {
-                if(huc != null) {
+                if (huc != null) {
                     huc.disconnect();
                 }
             }
@@ -389,11 +375,10 @@ public class ListLibraryItems extends CordovaPlugin {
         protected void onProgressUpdate(Integer... values) {
             super.onProgressUpdate(values);
 
-            Log.i("", "Wrote " + values[0] + " bytes (total: " + values[1] + " / " + values[2] + ")" );
+            Log.i("", "Wrote " + values[0] + " bytes (total: " + values[1] + " / " + values[2] + ")");
 
             // TODO: send progress
         }
-
 
         @Override
         protected void onPostExecute(Integer aResponseCode) {
