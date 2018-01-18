@@ -317,7 +317,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 while ((bytes_read = fis.read(buffer)) != -1) {
                     out.write(buffer, 0, bytes_read);
                     total_bytes += bytes_read;
-                    publishProgress(buffer_size, total_bytes, FILE_SZ);
+                    publishProgress(buffer_size, total_bytes, (int) FILE_SZ);
                 }
                 out.flush();
                 out.close();
