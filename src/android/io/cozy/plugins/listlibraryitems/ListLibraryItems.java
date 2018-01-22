@@ -306,7 +306,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 huc.setDoInput(true);
                 huc.setDoOutput(true);
                 huc.setRequestMethod("POST");
-                huc.setChunkedStreamingMode(1024 * 1000);
+                huc.setFixedLengthStreamingMode(FILE_SZ);
                 huc.setInstanceFollowRedirects(true);
 
                 // read input file chunks + publish progress
