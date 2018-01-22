@@ -26,6 +26,8 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.IOException;
+import java.io.FileNotFoundException;
 import java.net.Authenticator;
 import java.net.HttpURLConnection;
 import java.net.PasswordAuthentication;
@@ -36,6 +38,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Base64;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 
@@ -299,6 +304,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     huc.setRequestProperty(key, val);
                 }
                 huc.setRequestProperty("Content-Length", "" + FILE_SZ);
+                huc.setFixedLengthStreamingMode(FILE_SZ);
                 huc.setRequestProperty("User-Agent", System.getProperty("http.agent"));
 
                 // config request
@@ -306,8 +312,20 @@ public class ListLibraryItems extends CordovaPlugin {
                 huc.setDoInput(true);
                 huc.setDoOutput(true);
                 huc.setRequestMethod("POST");
-                huc.setFixedLengthStreamingMode(FILE_SZ);
                 huc.setInstanceFollowRedirects(true);
+
+
+                try {
+                    byte[] md5 = this.calculateMD5(file);
+
+                    if (md5 != null) {
+                        byte[] encodedBytes = Base64.getEncoder().encode(md5);
+                        huc.setRequestProperty("Content-MD5", new String(encodedBytes));
+                    }
+                }
+                catch (Exception e) {
+                  Log.e("Exception while calculating MD5 checksum", e.toString());
+                }
 
                 // read input file chunks + publish progress
                 OutputStream out = huc.getOutputStream();
@@ -383,6 +401,42 @@ public class ListLibraryItems extends CordovaPlugin {
         @Override
         protected void onPostExecute(Integer aResponseCode) {
             super.onPostExecute(aResponseCode);
+        }
+
+        protected byte[] calculateMD5 (File updateFile) {
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("MD5");
+            } catch (NoSuchAlgorithmException e) {
+                Log.e("Exception while getting digest", e.toString());
+                return null;
+            }
+
+            InputStream is;
+            try {
+                is = new FileInputStream(updateFile);
+            } catch (FileNotFoundException e) {
+                Log.e("Exception while getting FileInputStream", e.toString());
+                return null;
+            }
+
+            byte[] buffer = new byte[8192];
+            int read;
+            try {
+                while ((read = is.read(buffer)) > 0) {
+                    digest.update(buffer, 0, read);
+                }
+                byte[] md5sum = digest.digest();
+                return md5sum;
+            } catch (IOException e) {
+                throw new RuntimeException("Unable to process file for MD5", e);
+            } finally {
+                try {
+                    is.close();
+                } catch (IOException e) {
+                    Log.e("Exception on closing MD5 input stream", e.toString());
+                }
+            }
         }
     }
 }
