@@ -8,6 +8,7 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 import android.content.pm.PackageManager;
+import android.util.Base64;
 
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.CordovaInterface;
@@ -38,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Base64;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -319,7 +319,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     byte[] md5 = this.calculateMD5(file);
 
                     if (md5 != null) {
-                        byte[] encodedBytes = Base64.getEncoder().encode(md5);
+                        byte[] encodedBytes = Base64.encode(md5, Base64.DEFAULT);
                         huc.setRequestProperty("Content-MD5", new String(encodedBytes));
                     }
                 }
