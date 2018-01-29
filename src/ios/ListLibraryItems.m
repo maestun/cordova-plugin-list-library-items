@@ -238,6 +238,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                     mimeType = @"audio/wav";
                 } else if ([[fullPath pathExtension] rangeOfString:@"css"].location != NSNotFound) {
                     mimeType = @"text/css";
+                } else {
+                    mimeType = @"application/octet-stream";
                 }
             }
             CFRelease(typeId);
