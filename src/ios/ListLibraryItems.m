@@ -232,15 +232,15 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             mimeType = (__bridge_transfer NSString*)UTTypeCopyPreferredTagWithClass(typeId, kUTTagClassMIMEType);
             if (!mimeType) {
                 // special case for m4a
-                if ([(__bridge NSString*)typeId rangeOfString : @"m4a-audio"].location != NSNotFound) {
+                if ([(__bridge NSString*)typeId rangeOfString : @"m4a-audio" options:NSCaseInsensitiveSearch].location != NSNotFound) {
                     mimeType = @"audio/mp4";
-                } else if ([[fullPath pathExtension] rangeOfString:@"wav"].location != NSNotFound) {
-                    mimeType = @"audio/wav";
-                } else if ([[fullPath pathExtension] rangeOfString:@"css"].location != NSNotFound) {
+                } else if ([[fullPath pathExtension] rangeOfString:@"wav" options:NSCaseInsensitiveSearch].location != NSNotFound) {
+                    mimeType = @"audio/wav"; options:NSCaseInsensitiveSearch
+                } else if ([[fullPath pathExtension] rangeOfString:@"css" options:NSCaseInsensitiveSearch].location != NSNotFound) {
                     mimeType = @"text/css";
-                } else if ([[fullPath pathExtension] rangeOfString:@"heic"].location != NSNotFound) {
+                } else if ([[fullPath pathExtension] rangeOfString:@"heic" options:NSCaseInsensitiveSearch].location != NSNotFound) {
                     mimeType = @"image/heic";
-                } else if ([[fullPath pathExtension] rangeOfString:@"heif"].location != NSNotFound) {
+                } else if ([[fullPath pathExtension] rangeOfString:@"heif" options:NSCaseInsensitiveSearch].location != NSNotFound) {
                     mimeType = @"image/heif";
                 } else {
                     mimeType = @"application/octet-stream";
