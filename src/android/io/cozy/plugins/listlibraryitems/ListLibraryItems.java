@@ -311,6 +311,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 hb.add("Content-Length","" + FILE_SZ);
                 hb.add("User-Agent", System.getProperty("http.agent"));
                 hb.add("Expect","100-continue");
+                final String contentType = hb.get("Content-Type");
 
                 try {
                     byte[] md5 = this.calculateMD5(file);
@@ -327,12 +328,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 RequestBody body = new RequestBody() {
                     @Override
                     public MediaType contentType() {
-                        try {
-                            return MediaType.parse(headers.getString("Content-Type"));
-                        } catch(Exception e) {
-                            System.out.println(headers);
-                        }
-                        return null;
+                            return MediaType.parse(contentType);
                     }
 
                     @Override
