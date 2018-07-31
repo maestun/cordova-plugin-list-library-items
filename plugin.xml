@@ -31,7 +31,8 @@
 	</platform>
 
 	<!-- Android -->
-	<platform name="android">
+        <platform name="android">
+                <framework src="com.squareup.okhttp3:okhttp:3.11.0" />
 		<config-file target="res/xml/config.xml" parent="/*">
 			<feature name="ListLibraryItems">
 				<param name="android-package" value="io.cozy.plugins.listlibraryitems.ListLibraryItems"/>

@@ -42,6 +42,15 @@ import java.util.List;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Headers;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.MediaType;
+import okhttp3.Call;
+import okio.BufferedSink;
+
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 
 public class ListLibraryItems extends CordovaPlugin {
@@ -282,67 +291,88 @@ public class ListLibraryItems extends CordovaPlugin {
             String file_path = json.optString("filePath");
             String upload_url = json.optString("serverUrl");
             JSONObject headers = json.optJSONObject("headers");
-            HttpURLConnection huc = null;
+            OkHttpClient client = new OkHttpClient();
+            Call call = null;
+
             try {
-                // retrieve params from JS
-
-                int bytes_read, bytes_available, buffer_size, total_bytes;
-                byte[] buffer;
-                huc = (HttpURLConnection) new URL(upload_url).openConnection();
-
                 // get file sz
-                File file = new File(file_path);
-                FileInputStream fis = new FileInputStream(file);
-                bytes_available = fis.available();
+                final File file = new File(file_path);
                 final long FILE_SZ = file.length();
+
+                Headers.Builder hb = new Headers.Builder();
 
                 // set custom headers
                 Iterator<?> keys = headers.keys();
                 while (keys.hasNext()) {
                     String key = (String) keys.next();
                     String val = headers.getString(key);
-                    huc.setRequestProperty(key, val);
+                    hb.add(key, val);
                 }
-                huc.setRequestProperty("Content-Length", "" + FILE_SZ);
-                huc.setFixedLengthStreamingMode(FILE_SZ);
-                huc.setRequestProperty("User-Agent", System.getProperty("http.agent"));
-
-                // config request
-                huc.setUseCaches(false);
-                huc.setDoInput(true);
-                huc.setDoOutput(true);
-                huc.setRequestMethod("POST");
-                huc.setInstanceFollowRedirects(true);
-
+                hb.add("Content-Length","" + FILE_SZ);
+                hb.add("User-Agent", System.getProperty("http.agent"));
+                hb.add("Expect","100-continue");
 
                 try {
                     byte[] md5 = this.calculateMD5(file);
 
                     if (md5 != null) {
                         byte[] encodedBytes = Base64.encode(md5, Base64.DEFAULT);
-                        huc.setRequestProperty("Content-MD5", new String(encodedBytes));
+                        hb.add("Content-MD5", new String(encodedBytes).replace("\n",""));
                     }
                 }
                 catch (Exception e) {
-                  Log.e("Exception while calculating MD5 checksum", e.toString());
+                    Log.e("Exception while calculating MD5 checksum", e.toString());
                 }
 
-                // read input file chunks + publish progress
-                OutputStream out = huc.getOutputStream();
-                buffer_size = 4 * 1024;
-                buffer = new byte[buffer_size];
-                total_bytes = 0;
-                while ((bytes_read = fis.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytes_read);
-                    total_bytes += bytes_read;
-                    publishProgress(buffer_size, total_bytes, (int) FILE_SZ);
-                }
-                out.flush();
-                out.close();
+                RequestBody body = new RequestBody() {
+                    @Override
+                    public MediaType contentType() {
+                        try {
+                            return MediaType.parse(headers.getString("Content-Type"));
+                        } catch(Exception e) {
+                            System.out.println(headers);
+                        }
+                        return null;
+                    }
+
+                    @Override
+                    public long contentLength() {
+                        return FILE_SZ;
+                    }
+
+                    @Override
+                    public void writeTo(BufferedSink sink) throws IOException {
+                        FileInputStream fis = new FileInputStream(file);
+
+                        int bytes_read, bytes_available, buffer_size, total_bytes;
+                        byte[] buffer;
+
+                        // read input file chunks + publish progress
+                        bytes_available = fis.available();
+                        buffer_size = 4 * 1024;
+                        buffer = new byte[buffer_size];
+                        total_bytes = 0;
+                        while ((bytes_read = fis.read(buffer)) != -1) {
+                            sink.write(buffer, 0, bytes_read);
+                            total_bytes += bytes_read;
+                            publishProgress(buffer_size, total_bytes, (int) FILE_SZ);
+                        }
+                        fis.close();
+                    }
+                };
+
+                Request request = new Request.Builder()
+                  .url(upload_url)
+                  .headers(hb.build())
+                  .post(body)
+                  .build();
+
+                call = client.newCall(request);
+                Response response = call.execute();
 
                 // get server response
-                response_code = huc.getResponseCode();
-                String response_message = huc.getResponseMessage();
+                response_code = response.code();
+                String response_message = response.message();
 
                 // back to JS
                 if (response_code / 100 != 2) {
@@ -357,7 +387,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     mCallback.sendPluginResult(pr);
                 } else {
                     // ok
-                    InputStream is = huc.getInputStream();
+                    InputStream is = response.body().byteStream();
                     StringBuilder sb = new StringBuilder();
                     BufferedReader br = new BufferedReader(new InputStreamReader(is));
                     String read;
@@ -382,9 +412,9 @@ public class ListLibraryItems extends CordovaPlugin {
                 PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                 mCallback.sendPluginResult(pr);
             } finally {
-                if (huc != null) {
-                    huc.disconnect();
-                }
+              if (call != null) {
+                  call.cancel();
+              }
             }
             return response_code;
         }
