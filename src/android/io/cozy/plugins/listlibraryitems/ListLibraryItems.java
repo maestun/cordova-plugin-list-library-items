@@ -421,7 +421,16 @@ public class ListLibraryItems extends CordovaPlugin {
 
             Log.i("", "Wrote " + values[0] + " bytes (total: " + values[1] + " / " + values[2] + ")");
 
-            // TODO: send progress
+            float percent = ((float) values[1] / (float) values[2]) * 100.f;
+            JSONObject json_progress = new JSONObject();
+            try {
+                json_progress.put("progress",(int)percent);
+            } catch (JSONException ex) {
+
+            }
+            PluginResult pr = new PluginResult(PluginResult.Status.OK, json_progress);
+            pr.setKeepCallback(true);
+            mCallback.sendPluginResult(pr);
         }
 
         @Override
