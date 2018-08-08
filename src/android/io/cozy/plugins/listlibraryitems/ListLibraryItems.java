@@ -322,6 +322,17 @@ public class ListLibraryItems extends CordovaPlugin {
                 final String contentType = hb.get("Content-Type");
 
                 thumb = createThumbnail(file_path, contentType);
+                if(thumb != null && thumb.exists()) {
+                    JSONObject json_progress = new JSONObject();
+                    try {
+                        json_progress.put("thumbnail",thumb.getAbsoluteFile());
+                    } catch (JSONException ex) {
+
+                    }
+                    PluginResult pr = new PluginResult(PluginResult.Status.OK, json_progress);
+                    pr.setKeepCallback(true);
+                    mCallback.sendPluginResult(pr);
+                }
 
                 try {
                     byte[] md5 = this.calculateMD5(file);
@@ -514,15 +525,6 @@ public class ListLibraryItems extends CordovaPlugin {
                     if(thumb.exists()) {
                         FileOutputStream stream = new FileOutputStream(thumb);
                         bmp.compress(Bitmap.CompressFormat.PNG,100,stream);
-                        JSONObject json_progress = new JSONObject();
-                        try {
-                            json_progress.put("thumbnail",thumb.getAbsoluteFile());
-                        } catch (JSONException ex) {
-
-                        }
-                        PluginResult pr = new PluginResult(PluginResult.Status.OK, json_progress);
-                        pr.setKeepCallback(true);
-                        mCallback.sendPluginResult(pr);
                     } else {
                       thumb = null;
                     }
