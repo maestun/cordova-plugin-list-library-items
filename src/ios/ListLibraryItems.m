@@ -3,6 +3,8 @@
 
 #import <Photos/Photos.h>
 #import <MobileCoreServices/MobileCoreServices.h>
+#import "NSFileManager+Size.h"
+#import "NSFileManager+MD5.h"
 
 static NSString * PERMISSION_ERROR = @"Permission Denial: This application is not allowed to access Photo data.";
 
@@ -142,6 +144,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                         [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
                     }
 
+                    [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
+                    [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
                     NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
                     [task resume];
                 }

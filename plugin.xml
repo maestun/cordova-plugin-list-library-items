@@ -28,6 +28,12 @@
         </config-file>
 		<header-file src="src/ios/ListLibraryItems.h"/>
 		<source-file src="src/ios/ListLibraryItems.m"/>
+    <header-file src="src/ios/NSData+MD5.h"/>
+    <source-file src="src/ios/NSData+MD5.m"/>
+    <header-file src="src/ios/NSFileManager+MD5.h"/>
+		<source-file src="src/ios/NSFileManager+MD5.m"/>
+    <header-file src="src/ios/NSFileManager+Size.h"/>
+		<source-file src="src/ios/NSFileManager+Size.m"/>
 	</platform>
 
 	<!-- Android -->
