@@ -1,0 +1,32 @@
+{
+  "name": "cordova-plugin-list-library-items",
+  "version": "1.0.0",
+  "description": "List and Upload phone's library items (pics, videos...)",
+  "directories": {
+    "doc": "doc",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cozy/cordova-plugin-list-library-items.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cozy/cordova-plugin-list-library-items/issues"
+  },
+  "homepage": "https://github.com/cozy/cordova-plugin-list-library-items#readme",
+  "cordova": {
+    "id": "io.cozy.plugins.listlibraryitems",
+    "platforms": [
+      "android",
+      "ios"
+    ]
+  },
+  "engines": [
+    {
+      "name": "cordova",
+      "version": ">=5.0.0"
+    }
+  ]
+}
