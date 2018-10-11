@@ -296,11 +296,15 @@ public class ListLibraryItems extends CordovaPlugin {
 
             String file_path = json.optString("filePath");
             String upload_url = json.optString("serverUrl");
+            String httpMethod = json.optString('httpMethod');
             JSONObject headers = json.optJSONObject("headers");
             OkHttpClient client = new OkHttpClient();
             Call call = null;
             File thumb = null;
-
+            String methode = 'POST'
+            if(httpMethod !== ''){
+                httpMethod = httpMethod
+            }
             try {
                 // get file sz
                 final File file = new File(file_path);
@@ -377,12 +381,20 @@ public class ListLibraryItems extends CordovaPlugin {
                         fis.close();
                     }
                 };
-
+                if(httpMethod === 'PUT'){
+                Request request = new Request.Builder()
+                  .url(upload_url)
+                  .headers(hb.build())
+                  .put(body)
+                  .build();
+                } else {
                 Request request = new Request.Builder()
                   .url(upload_url)
                   .headers(hb.build())
                   .post(body)
                   .build();
+                }
+                
 
                 call = client.newCall(request);
                 Response response = call.execute();
