@@ -152,7 +152,7 @@ public class ListLibraryItems extends CordovaPlugin {
     }
 
     private boolean listItems(CallbackContext callbackContext, boolean includePictures, boolean includeVideos,
-            boolean includeCloud) {
+                              boolean includeCloud) {
         try {
             // All columns here: https://developer.android.com/reference/android/provider/MediaStore.Images.ImageColumns.html,
             // https://developer.android.com/reference/android/provider/MediaStore.MediaColumns.html
@@ -296,14 +296,14 @@ public class ListLibraryItems extends CordovaPlugin {
 
             String file_path = json.optString("filePath");
             String upload_url = json.optString("serverUrl");
-            String httpMethod = json.optString('httpMethod');
+            String httpMethod = json.optString("httpMethod");
             JSONObject headers = json.optJSONObject("headers");
             OkHttpClient client = new OkHttpClient();
             Call call = null;
             File thumb = null;
-            String methode = 'POST'
-            if(httpMethod !== ''){
-                httpMethod = httpMethod
+            String methode = "POST";
+            if(httpMethod != ""){
+                methode = httpMethod;
             }
             try {
                 // get file sz
@@ -353,7 +353,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 RequestBody body = new RequestBody() {
                     @Override
                     public MediaType contentType() {
-                            return MediaType.parse(contentType);
+                        return MediaType.parse(contentType);
                     }
 
                     @Override
@@ -381,20 +381,21 @@ public class ListLibraryItems extends CordovaPlugin {
                         fis.close();
                     }
                 };
-                if(httpMethod === 'PUT'){
-                Request request = new Request.Builder()
-                  .url(upload_url)
-                  .headers(hb.build())
-                  .put(body)
-                  .build();
+                Request request;
+                if(methode.equals("PUT")){
+                   request = new Request.Builder()
+                            .url(upload_url)
+                            .headers(hb.build())
+                            .put(body)
+                            .build();
                 } else {
-                Request request = new Request.Builder()
-                  .url(upload_url)
-                  .headers(hb.build())
-                  .post(body)
-                  .build();
+                    request = new Request.Builder()
+                            .url(upload_url)
+                            .headers(hb.build())
+                            .post(body)
+                            .build();
                 }
-                
+
 
                 call = client.newCall(request);
                 Response response = call.execute();
@@ -441,12 +442,12 @@ public class ListLibraryItems extends CordovaPlugin {
                 PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                 mCallback.sendPluginResult(pr);
             } finally {
-              if (call != null) {
-                  call.cancel();
-              }
-              if(thumb != null && thumb.exists()) {
-                  thumb.delete();
-              }
+                if (call != null) {
+                    call.cancel();
+                }
+                if(thumb != null && thumb.exists()) {
+                    thumb.delete();
+                }
             }
             return response_code;
         }
@@ -538,7 +539,7 @@ public class ListLibraryItems extends CordovaPlugin {
                         FileOutputStream stream = new FileOutputStream(thumb);
                         bmp.compress(Bitmap.CompressFormat.PNG,100,stream);
                     } else {
-                      thumb = null;
+                        thumb = null;
                     }
                 }
             }
