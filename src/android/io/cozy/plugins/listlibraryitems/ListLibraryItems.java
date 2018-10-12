@@ -288,7 +288,6 @@ public class ListLibraryItems extends CordovaPlugin {
         @Override
         protected Integer doInBackground(UploadFilePayload... uploadFilePayloads) {
 
-            final int MAX_BUFFER_SZ = 1024;
             Integer response_code = 0;
 
             JSONObject json = uploadFilePayloads[0].mJSONObject;
@@ -301,9 +300,9 @@ public class ListLibraryItems extends CordovaPlugin {
             OkHttpClient client = new OkHttpClient();
             Call call = null;
             File thumb = null;
-            String methode = "POST";
+            String method = "POST";
             if(httpMethod != ""){
-                methode = httpMethod;
+                method = httpMethod;
             }
             try {
                 // get file sz
@@ -382,7 +381,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     }
                 };
                 Request request;
-                if(methode.equals("PUT")){
+                if(method.equals("PUT")){
                    request = new Request.Builder()
                             .url(upload_url)
                             .headers(hb.build())
