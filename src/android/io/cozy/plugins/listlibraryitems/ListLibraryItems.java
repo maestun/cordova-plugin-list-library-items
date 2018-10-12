@@ -152,7 +152,7 @@ public class ListLibraryItems extends CordovaPlugin {
     }
 
     private boolean listItems(CallbackContext callbackContext, boolean includePictures, boolean includeVideos,
-            boolean includeCloud) {
+                              boolean includeCloud) {
         try {
             // All columns here: https://developer.android.com/reference/android/provider/MediaStore.Images.ImageColumns.html,
             // https://developer.android.com/reference/android/provider/MediaStore.MediaColumns.html
@@ -288,7 +288,6 @@ public class ListLibraryItems extends CordovaPlugin {
         @Override
         protected Integer doInBackground(UploadFilePayload... uploadFilePayloads) {
 
-            final int MAX_BUFFER_SZ = 1024;
             Integer response_code = 0;
 
             JSONObject json = uploadFilePayloads[0].mJSONObject;
@@ -296,11 +295,15 @@ public class ListLibraryItems extends CordovaPlugin {
 
             String file_path = json.optString("filePath");
             String upload_url = json.optString("serverUrl");
+            String httpMethod = json.optString("httpMethod");
             JSONObject headers = json.optJSONObject("headers");
             OkHttpClient client = new OkHttpClient();
             Call call = null;
             File thumb = null;
-
+            String method = "POST";
+            if(httpMethod != ""){
+                method = httpMethod;
+            }
             try {
                 // get file sz
                 final File file = new File(file_path);
@@ -349,7 +352,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 RequestBody body = new RequestBody() {
                     @Override
                     public MediaType contentType() {
-                            return MediaType.parse(contentType);
+                        return MediaType.parse(contentType);
                     }
 
                     @Override
@@ -377,12 +380,21 @@ public class ListLibraryItems extends CordovaPlugin {
                         fis.close();
                     }
                 };
+                Request request;
+                if(method.equals("PUT")){
+                   request = new Request.Builder()
+                            .url(upload_url)
+                            .headers(hb.build())
+                            .put(body)
+                            .build();
+                } else {
+                    request = new Request.Builder()
+                            .url(upload_url)
+                            .headers(hb.build())
+                            .post(body)
+                            .build();
+                }
 
-                Request request = new Request.Builder()
-                  .url(upload_url)
-                  .headers(hb.build())
-                  .post(body)
-                  .build();
 
                 call = client.newCall(request);
                 Response response = call.execute();
@@ -429,12 +441,12 @@ public class ListLibraryItems extends CordovaPlugin {
                 PluginResult pr = new PluginResult(PluginResult.Status.ERROR, json_error);
                 mCallback.sendPluginResult(pr);
             } finally {
-              if (call != null) {
-                  call.cancel();
-              }
-              if(thumb != null && thumb.exists()) {
-                  thumb.delete();
-              }
+                if (call != null) {
+                    call.cancel();
+                }
+                if(thumb != null && thumb.exists()) {
+                    thumb.delete();
+                }
             }
             return response_code;
         }
@@ -526,7 +538,7 @@ public class ListLibraryItems extends CordovaPlugin {
                         FileOutputStream stream = new FileOutputStream(thumb);
                         bmp.compress(Bitmap.CompressFormat.PNG,100,stream);
                     } else {
-                      thumb = null;
+                        thumb = null;
                     }
                 }
             }

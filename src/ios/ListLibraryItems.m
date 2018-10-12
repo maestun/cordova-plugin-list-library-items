@@ -97,9 +97,11 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSString * uploadUrl  = payload[@"serverUrl"];
     NSDictionary * headers = payload[@"headers"];
     NSString * libraryId = payload[@"libraryId"];
-	
+    NSString * httpMethod = @"POST";
     mCommand = command;
-    
+    if ([payload[@"httpMethod"] length] > 0 ) {
+        httpMethod = payload[@"httpMethod"];
+    }
     // try to fetch asset
     PHFetchResult<PHAsset *> * assets = [PHAsset fetchAssetsWithLocalIdentifiers:@[libraryId] options:kNilOptions];
     if([assets count] == 0) {
@@ -138,7 +140,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                     NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
 
                     NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
-                    [request setHTTPMethod: @"POST"];
+                    [request setHTTPMethod: httpMethod];
                     
                     for(NSString * header in [headers allKeys]) {
                         [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
