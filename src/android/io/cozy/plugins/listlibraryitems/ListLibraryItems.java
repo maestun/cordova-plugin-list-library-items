@@ -266,7 +266,7 @@ public class ListLibraryItems extends CordovaPlugin {
         String type = null;
         String extension = MimeTypeMap.getFileExtensionFromUrl(url);
         if (extension != null) {
-            type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension);
+            type = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.toLowerCase());
         }
         return type;
     }
