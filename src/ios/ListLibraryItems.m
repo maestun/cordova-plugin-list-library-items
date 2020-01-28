@@ -113,6 +113,11 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
     else {
         for(PHAsset * asset in assets) {
+            //image 1 or Video 2
+            if(asset.mediaType != PHAssetMediaTypeImage && asset.mediaType != PHAssetMediaTypeVideo){
+                //do nothing
+            } else {
+            
             NSArray * resources = [PHAssetResource assetResourcesForAsset:asset];
             for(PHAssetResource * resource in resources){
                 //Since JS is sending the filename... and we can have several resources for one asset, we need to override the filename here
@@ -177,7 +182,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                 }
             }];
         }
-                                   }
+            }
+        }
     }
 }
 
