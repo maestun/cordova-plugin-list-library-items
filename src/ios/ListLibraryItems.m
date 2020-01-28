@@ -95,9 +95,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     
     NSDictionary * payload = command.arguments[0];
     NSString * uploadUrl  = payload[@"serverUrl"];
-    NSDictionary * headers = payload[@"headers"];
+    NSMutableDictionary * headers = payload[@"headers"];
     NSString * libraryId = payload[@"libraryId"];
     NSString * httpMethod = @"POST";
+    
     mCommand = command;
     if ([payload[@"httpMethod"] length] > 0 ) {
         httpMethod = payload[@"httpMethod"];
@@ -112,7 +113,29 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
     else {
         for(PHAsset * asset in assets) {
-            PHAssetResource * resource = [[PHAssetResource assetResourcesForAsset:asset] firstObject];;
+            NSArray * resources = [PHAssetResource assetResourcesForAsset:asset];
+            for(PHAssetResource * resource in resources){
+                //Since JS is sending the filename... and we can have several resources for one asset, we need to override the filename here
+            NSURLComponents *components = [NSURLComponents componentsWithString:payload[@"serverUrl"]];
+            
+                NSURLQueryItem * newQueryItemName = [[NSURLQueryItem alloc] initWithName:@"Name" value:resource.originalFilename];
+                NSURLQueryItem * newQueryItemmimeType = [[NSURLQueryItem alloc] initWithName:@"mimeType" value:[self getMimeTypeFromPath:resource.originalFilename]];
+                
+                NSMutableArray * newQueryItems = [NSMutableArray arrayWithCapacity:[components.queryItems count] + 1];
+            
+            for (NSURLQueryItem * qi in components.queryItems) {
+                if (![qi.name isEqual:newQueryItemName.name] || [qi.name isEqual:newQueryItemmimeType.name]) {
+                    [newQueryItems addObject:qi];
+                }
+            }
+            [newQueryItems addObject:newQueryItemName];
+                [newQueryItems addObject:newQueryItemmimeType];
+            [components setQueryItems:newQueryItems];
+
+            uploadUrl = [[components URL] absoluteString];
+                //end Override
+                
+                
             NSString * temp_path = [NSTemporaryDirectory() stringByAppendingString:[resource originalFilename]];
             mLocalTempURL = [NSURL fileURLWithPath:temp_path];
             [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil]; // cleanup
@@ -143,6 +166,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                     [request setHTTPMethod: httpMethod];
                     
                     for(NSString * header in [headers allKeys]) {
+                        [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
                         [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
                     }
 
@@ -153,6 +177,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                 }
             }];
         }
+                                   }
     }
 }
 
