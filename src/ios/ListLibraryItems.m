@@ -114,13 +114,24 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     else {
         for(PHAsset * asset in assets) {
             //image 1 or Video 2
+            
             if(asset.mediaType != PHAssetMediaTypeImage && asset.mediaType != PHAssetMediaTypeVideo){
                 //do nothing
             } else {
-            
+                //Since an Asset can have several ressources, we define the resource
+                //type to use. If Image then we get only the photo, if we have a video
+                //we onyle want the video
+                NSInteger typeToUse;
+                if(asset.mediaType == PHAssetMediaTypeImage){
+                    typeToUse = PHAssetResourceTypePhoto;
+                }
+                if(asset.mediaType == PHAssetMediaTypeVideo){
+                    typeToUse = PHAssetResourceTypeVideo;
+                }
             NSArray * resources = [PHAssetResource assetResourcesForAsset:asset];
             for(PHAssetResource * resource in resources){
-                //Since JS is sending the filename... and we can have several resources for one asset, we need to override the filename here
+                if(resource.type == typeToUse){
+                /*Since JS is sending the filename... and we can have several resources for one asset, we need to override the filename here
             NSURLComponents *components = [NSURLComponents componentsWithString:payload[@"serverUrl"]];
             
                 NSURLQueryItem * newQueryItemName = [[NSURLQueryItem alloc] initWithName:@"Name" value:resource.originalFilename];
@@ -137,7 +148,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                 [newQueryItems addObject:newQueryItemmimeType];
             [components setQueryItems:newQueryItems];
 
-            uploadUrl = [[components URL] absoluteString];
+            uploadUrl = [[components URL] absoluteString];*/
                 //end Override
                 
                 
@@ -184,6 +195,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         }
             }
         }
+    }
     }
 }
 
@@ -309,7 +321,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
 #pragma mark - NSURLSessionTaskDelegate
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didSendBodyData:(int64_t)bytesSent totalBytesSent:(int64_t)totalBytesSent totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
-    NSLog(@"didSendBodyData: send %lld / %lld", totalBytesSent, totalBytesExpectedToSend);
+    //NSLog(@"didSendBodyData: send %lld / %lld", totalBytesSent, totalBytesExpectedToSend);
     // TODO: call JS
     
 }
@@ -337,7 +349,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         [self returnUploadResult:NO payload:json command:mCommand];
     } else {
         NSLog(@"--- STATUS OK ---");
-        NSLog(@"%@", response);
+        //NSLog(@"%@", response);
         [self returnUploadResult:YES payload:mReceivedData command:mCommand];
     }
 }
