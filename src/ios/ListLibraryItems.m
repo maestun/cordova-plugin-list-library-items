@@ -113,89 +113,66 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
     else {
         for(PHAsset * asset in assets) {
-            //image 1 or Video 2
-            
-            if(asset.mediaType != PHAssetMediaTypeImage && asset.mediaType != PHAssetMediaTypeVideo){
-                //do nothing
-            } else {
-                //Since an Asset can have several ressources, we define the resource
-                //type to use. If Image then we get only the photo, if we have a video
-                //we onyle want the video
-                NSInteger typeToUse;
-                if(asset.mediaType == PHAssetMediaTypeImage){
-                    typeToUse = PHAssetResourceTypePhoto;
-                }
-                if(asset.mediaType == PHAssetMediaTypeVideo){
-                    typeToUse = PHAssetResourceTypeVideo;
-                }
+            //Since an Asset can have several ressources, we define the resource
+            //type to use. If Image then we get only the photo, if we have a video
+            //we onyle want the video
+            NSInteger typeToUse;
+            if(asset.mediaType == PHAssetMediaTypeImage){
+                typeToUse = PHAssetResourceTypePhoto;
+            }
+            if(asset.mediaType == PHAssetMediaTypeVideo){
+                typeToUse = PHAssetResourceTypeVideo;
+            }
+            BOOL hasFoundMatchingResource = FALSE;
             NSArray * resources = [PHAssetResource assetResourcesForAsset:asset];
             for(PHAssetResource * resource in resources){
                 if(resource.type == typeToUse){
-                /*Since JS is sending the filename... and we can have several resources for one asset, we need to override the filename here
-            NSURLComponents *components = [NSURLComponents componentsWithString:payload[@"serverUrl"]];
+                    hasFoundMatchingResource = TRUE;
+                    NSString * temp_path = [NSTemporaryDirectory() stringByAppendingString:[resource originalFilename]];
+                    mLocalTempURL = [NSURL fileURLWithPath:temp_path];
+                    [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil]; // cleanup
+                    PHAssetResourceRequestOptions * options = [PHAssetResourceRequestOptions new];
+                    [options setNetworkAccessAllowed: YES];
+                    [options setProgressHandler:^(double progress) {
+                        NSLog(@"progress %f", progress);
+                    }];
             
-                NSURLQueryItem * newQueryItemName = [[NSURLQueryItem alloc] initWithName:@"Name" value:resource.originalFilename];
-                NSURLQueryItem * newQueryItemmimeType = [[NSURLQueryItem alloc] initWithName:@"mimeType" value:[self getMimeTypeFromPath:resource.originalFilename]];
-                
-                NSMutableArray * newQueryItems = [NSMutableArray arrayWithCapacity:[components.queryItems count] + 1];
-            
-            for (NSURLQueryItem * qi in components.queryItems) {
-                if (![qi.name isEqual:newQueryItemName.name] || [qi.name isEqual:newQueryItemmimeType.name]) {
-                    [newQueryItems addObject:qi];
+                    [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
+                        if (aError) {
+                            // cannot fetch asset
+                            NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@ (%@)", libraryId, [aError localizedDescription]];
+                            NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
+                            [self returnUploadResult:NO payload:json command:command];
+                        } else {
+                            // create upload session
+                            NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:libraryId];
+                            [config setDiscretionary:YES]; // iOS will perform background upload when better suited
+                            [config setSessionSendsLaunchEvents:YES]; // launch app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
+        //                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
+                            NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
+
+                            NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
+                            [request setHTTPMethod: httpMethod];
+                            
+                            for(NSString * header in [headers allKeys]) {
+        //                        [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
+                                [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
+                            }
+
+                            [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
+                            [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
+                            NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
+                            [task resume];
+                        }
+                    }];
                 }
             }
-            [newQueryItems addObject:newQueryItemName];
-                [newQueryItems addObject:newQueryItemmimeType];
-            [components setQueryItems:newQueryItems];
-
-            uploadUrl = [[components URL] absoluteString];*/
-                //end Override
-                
-                
-            NSString * temp_path = [NSTemporaryDirectory() stringByAppendingString:[resource originalFilename]];
-            mLocalTempURL = [NSURL fileURLWithPath:temp_path];
-            [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil]; // cleanup
-            PHAssetResourceRequestOptions * options = [PHAssetResourceRequestOptions new];
-            [options setNetworkAccessAllowed: YES];
-            [options setProgressHandler:^(double progress) {
-                NSLog(@"progress %f", progress);
-            }];
-            
-            [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
-                if (aError) {
-                    // cannot fetch asset
-                    NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@ (%@)", libraryId, [aError localizedDescription]];
-                    NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
-                    [self returnUploadResult:NO payload:json command:command];
-                }
-                else {
-                    
-                    // create upload session
-                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:libraryId];
-                    [config setDiscretionary:YES]; // iOS will perform background upload when better suited
-                    [config setSessionSendsLaunchEvents:YES]; // launch app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
-                    
-//                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
-                    NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
-
-                    NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
-                    [request setHTTPMethod: httpMethod];
-                    
-                    for(NSString * header in [headers allKeys]) {
-                        [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
-                        [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
-                    }
-
-                    [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
-                    [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
-                    NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
-                    [task resume];
-                }
-            }];
-        }
+            if(!hasFoundMatchingResource){
+                NSString * message = [NSString stringWithFormat:@"Cannot find resource for asset %@", libraryId];
+                       NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
+                       [self returnUploadResult:NO payload:json command:command];
             }
         }
-    }
     }
 }
 
@@ -321,7 +298,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
 #pragma mark - NSURLSessionTaskDelegate
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didSendBodyData:(int64_t)bytesSent totalBytesSent:(int64_t)totalBytesSent totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
-    //NSLog(@"didSendBodyData: send %lld / %lld", totalBytesSent, totalBytesExpectedToSend);
+    NSLog(@"didSendBodyData: send %lld / %lld", totalBytesSent, totalBytesExpectedToSend);
     // TODO: call JS
     
 }
@@ -349,7 +326,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         [self returnUploadResult:NO payload:json command:mCommand];
     } else {
         NSLog(@"--- STATUS OK ---");
-        //NSLog(@"%@", response);
+        NSLog(@"%@", response);
         [self returnUploadResult:YES payload:mReceivedData command:mCommand];
     }
 }
