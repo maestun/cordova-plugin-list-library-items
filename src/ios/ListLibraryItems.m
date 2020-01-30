@@ -155,7 +155,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                             [request setHTTPMethod: httpMethod];
                             
                             for(NSString * header in [headers allKeys]) {
-        //                        [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
+                                [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
                                 [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
                             }
 
