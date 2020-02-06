@@ -95,9 +95,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     
     NSDictionary * payload = command.arguments[0];
     NSString * uploadUrl  = payload[@"serverUrl"];
-    NSDictionary * headers = payload[@"headers"];
+    NSMutableDictionary * headers = payload[@"headers"];
     NSString * libraryId = payload[@"libraryId"];
     NSString * httpMethod = @"POST";
+    
     mCommand = command;
     if ([payload[@"httpMethod"] length] > 0 ) {
         httpMethod = payload[@"httpMethod"];
@@ -112,46 +113,65 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
     else {
         for(PHAsset * asset in assets) {
-            PHAssetResource * resource = [[PHAssetResource assetResourcesForAsset:asset] firstObject];;
-            NSString * temp_path = [NSTemporaryDirectory() stringByAppendingString:[resource originalFilename]];
-            mLocalTempURL = [NSURL fileURLWithPath:temp_path];
-            [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil]; // cleanup
-            PHAssetResourceRequestOptions * options = [PHAssetResourceRequestOptions new];
-            [options setNetworkAccessAllowed: YES];
-            [options setProgressHandler:^(double progress) {
-                NSLog(@"progress %f", progress);
-            }];
+            //Since an Asset can have several ressources, we define the resource
+            //type to use. If Image then we get only the photo, if we have a video
+            //we onyle want the video
+            NSInteger typeToUse;
+            if(asset.mediaType == PHAssetMediaTypeImage){
+                typeToUse = PHAssetResourceTypePhoto;
+            }
+            if(asset.mediaType == PHAssetMediaTypeVideo){
+                typeToUse = PHAssetResourceTypeVideo;
+            }
+            BOOL hasFoundMatchingResource = FALSE;
+            NSArray * resources = [PHAssetResource assetResourcesForAsset:asset];
+            for(PHAssetResource * resource in resources){
+                if(resource.type == typeToUse){
+                    hasFoundMatchingResource = TRUE;
+                    NSString * temp_path = [NSTemporaryDirectory() stringByAppendingString:[resource originalFilename]];
+                    mLocalTempURL = [NSURL fileURLWithPath:temp_path];
+                    [[NSFileManager defaultManager] removeItemAtURL:mLocalTempURL error:nil]; // cleanup
+                    PHAssetResourceRequestOptions * options = [PHAssetResourceRequestOptions new];
+                    [options setNetworkAccessAllowed: YES];
+                    [options setProgressHandler:^(double progress) {
+                        NSLog(@"progress %f", progress);
+                    }];
             
-            [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
-                if (aError) {
-                    // cannot fetch asset
-                    NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@ (%@)", libraryId, [aError localizedDescription]];
-                    NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
-                    [self returnUploadResult:NO payload:json command:command];
-                }
-                else {
-                    
-                    // create upload session
-                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:libraryId];
-                    [config setDiscretionary:YES]; // iOS will perform background upload when better suited
-                    [config setSessionSendsLaunchEvents:YES]; // launch app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
-                    
-//                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
-                    NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
+                    [[PHAssetResourceManager defaultManager] writeDataForAssetResource:resource toFile:mLocalTempURL options:options completionHandler:^(NSError * _Nullable aError) {
+                        if (aError) {
+                            // cannot fetch asset
+                            NSString * message = [NSString stringWithFormat:@"Cannot fetch asset %@ (%@)", libraryId, [aError localizedDescription]];
+                            NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
+                            [self returnUploadResult:NO payload:json command:command];
+                        } else {
+                            // create upload session
+                            NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:libraryId];
+                            [config setDiscretionary:YES]; // iOS will perform background upload when better suited
+                            [config setSessionSendsLaunchEvents:YES]; // launch app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
+        //                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
+                            NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
 
-                    NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
-                    [request setHTTPMethod: httpMethod];
-                    
-                    for(NSString * header in [headers allKeys]) {
-                        [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
-                    }
+                            NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
+                            [request setHTTPMethod: httpMethod];
+                            
+                            for(NSString * header in [headers allKeys]) {
+                                [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
+                                [request setValue:[headers objectForKey:header] forHTTPHeaderField:header];
+                            }
 
-                    [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
-                    [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
-                    NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
-                    [task resume];
+                            [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
+                            [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
+                            NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
+                            [task resume];
+                        }
+                    }];
                 }
-            }];
+            }
+            if(!hasFoundMatchingResource){
+                NSString * message = [NSString stringWithFormat:@"Cannot find resource for asset %@", libraryId];
+                       NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
+                       [self returnUploadResult:NO payload:json command:command];
+            }
         }
     }
 }
