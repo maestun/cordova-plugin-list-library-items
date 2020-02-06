@@ -38,7 +38,6 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.security.MessageDigest;
@@ -91,7 +90,7 @@ public class ListLibraryItems extends CordovaPlugin {
                         if (!cordova.hasPermission(READ_EXTERNAL_STORAGE)) {
                             callbackContext.error(PERMISSION_ERROR);
                         } else {
-                            listItems(callbackContext, args.getBoolean(0), args.getBoolean(1), args.getBoolean(2), args.getJSONArray(3));
+                            listItems(callbackContext, args.getBoolean(0), args.getBoolean(1), args.getBoolean(2));
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -108,22 +107,6 @@ public class ListLibraryItems extends CordovaPlugin {
                         ufp.mJSONObject = args.getJSONObject(0);
                         ufp.mCallbackContext = callbackContext;
                         new UploadFileTask().execute(ufp);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        callbackContext.error(e.getMessage());
-                    }
-                }
-            });
-            return true;
-        } else if ("listMediaBuckets".equals(action)) {
-            cordova.getThreadPool().execute(new Runnable() {
-                public void run() {
-                    try {
-                        if (!cordova.hasPermission(READ_EXTERNAL_STORAGE)) {
-                            callbackContext.error(PERMISSION_ERROR);
-                        } else {
-                            listMediaBuckets(callbackContext);
-                        }
                     } catch (Exception e) {
                         e.printStackTrace();
                         callbackContext.error(e.getMessage());
@@ -169,7 +152,7 @@ public class ListLibraryItems extends CordovaPlugin {
     }
 
     private boolean listItems(CallbackContext callbackContext, boolean includePictures, boolean includeVideos,
-                              boolean includeCloud, JSONArray mediaBuckets) {
+                              boolean includeCloud) {
         try {
             // All columns here: https://developer.android.com/reference/android/provider/MediaStore.Images.ImageColumns.html,
             // https://developer.android.com/reference/android/provider/MediaStore.MediaColumns.html
@@ -191,15 +174,15 @@ public class ListLibraryItems extends CordovaPlugin {
 
             if (includePictures) {
                 queryResults
-                        .addAll(queryContentProvider(mContext, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columns, mediaBuckets));
+                        .addAll(queryContentProvider(mContext, MediaStore.Images.Media.EXTERNAL_CONTENT_URI, columns));
                 queryResults
-                        .addAll(queryContentProvider(mContext, MediaStore.Images.Media.INTERNAL_CONTENT_URI, columns, mediaBuckets));
+                        .addAll(queryContentProvider(mContext, MediaStore.Images.Media.INTERNAL_CONTENT_URI, columns));
             }
             if (includeVideos) {
                 queryResults
-                        .addAll(queryContentProvider(mContext, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, columns, mediaBuckets));
+                        .addAll(queryContentProvider(mContext, MediaStore.Video.Media.EXTERNAL_CONTENT_URI, columns));
                 queryResults
-                        .addAll(queryContentProvider(mContext, MediaStore.Video.Media.INTERNAL_CONTENT_URI, columns, mediaBuckets));
+                        .addAll(queryContentProvider(mContext, MediaStore.Video.Media.INTERNAL_CONTENT_URI, columns));
             }
 
             JSONObject result = new JSONObject();
@@ -216,7 +199,7 @@ public class ListLibraryItems extends CordovaPlugin {
         }
     }
 
-    private ArrayList<JSONObject> queryContentProvider(Context context, Uri collection, JSONObject columns, JSONArray mediaBuckets)
+    private ArrayList<JSONObject> queryContentProvider(Context context, Uri collection, JSONObject columns)
             throws Exception {
 
         // TODO: filter
@@ -234,16 +217,8 @@ public class ListLibraryItems extends CordovaPlugin {
         }
 
         // https://stackoverflow.com/a/20429397
-        String selection = MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " IN ( ";
-        final String[] selectionArgs = new String[mediaBuckets.length()];
-        for (int i = 0; i < mediaBuckets.length(); i++) {
-            selection += "?";
-            if(i != mediaBuckets.length() - 1) {
-                selection += ", ";
-            }
-            selectionArgs[i] = mediaBuckets.optString(i);
-        }
-        selection += " ) ";
+        final String selection = MediaStore.Images.Media.BUCKET_DISPLAY_NAME + " = ?";
+        final String[] selectionArgs = new String[] { "Camera" };
 
         final String sortOrder = MediaStore.Images.Media.DATE_TAKEN;
 
@@ -570,47 +545,4 @@ public class ListLibraryItems extends CordovaPlugin {
             return thumb;
         }
     }
-
-    private boolean listMediaBuckets(CallbackContext callbackContext) {
-        try {
-            final HashSet<String> queryResults = new HashSet<>();
-            queryResults.addAll(listMediaBucketsByUri(MediaStore.Images.Media.INTERNAL_CONTENT_URI));
-            queryResults.addAll(listMediaBucketsByUri(MediaStore.Video.Media.INTERNAL_CONTENT_URI));
-            queryResults.addAll(listMediaBucketsByUri(MediaStore.Images.Media.EXTERNAL_CONTENT_URI));
-            queryResults.addAll(listMediaBucketsByUri(MediaStore.Video.Media.EXTERNAL_CONTENT_URI));
-
-            PluginResult pluginResult = new PluginResult(PluginResult.Status.OK, new JSONArray(queryResults));
-            callbackContext.sendPluginResult(pluginResult);
-            return true;
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            callbackContext.error(e.getMessage());
-            return false;
-        }
-    }
-
-    private HashSet<String> listMediaBucketsByUri(Uri uri) throws JSONException {
-        String[] PROJECTION_BUCKET = {
-                MediaStore.Images.Media.BUCKET_ID,
-                MediaStore.Images.Media.BUCKET_DISPLAY_NAME
-        };
-        String BUCKET_GROUP_BY = "1) GROUP BY 1,(2";
-
-        final HashSet<String> queryResults = new HashSet<>();
-        try(Cursor cursor = mContext.getContentResolver().query(uri, PROJECTION_BUCKET, BUCKET_GROUP_BY, null, null)) {
-            if (cursor.moveToFirst()) {
-                int bucketNameColumn = cursor.getColumnIndex(MediaStore.Images.Media.BUCKET_DISPLAY_NAME);
-                int bucketIdColumn = cursor.getColumnIndex(MediaStore.Images.Media.BUCKET_ID);
-
-                do {
-                    String bucketName = cursor.getString(bucketNameColumn);
-                    queryResults.add(bucketName);
-
-                } while (cursor.moveToNext());
-            }
-        }
-        return queryResults;
-    }
-
 }

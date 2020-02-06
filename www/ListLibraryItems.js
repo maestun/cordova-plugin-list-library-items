@@ -13,19 +13,14 @@ var listLibraryItems = {
 		cordova.exec(onSuccess, onError, 'ListLibraryItems', 'requestReadAuthorization', []);
 	},
 
-	listItems: function(includePictures, includeVideos, includeCloud, mediaBuckets, onSuccess, onError) {
-		console.log('ListLibraryItems plugin: calling listItems for buckets [%s]...', [...mediaBuckets].join(', '));
-		cordova.exec(onSuccess, onError, 'ListLibraryItems', 'listItems', [includePictures, includeVideos, includeCloud, mediaBuckets]);
+	listItems: function(includePictures, includeVideos, includeCloud, onSuccess, onError) {
+		console.log('ListLibraryItems plugin: calling listItems...');
+		cordova.exec(onSuccess, onError, 'ListLibraryItems', 'listItems', [includePictures, includeVideos, includeCloud]);
 	},
 
 	uploadItem: function(payload, onSuccess, onError) {
 		console.log('ListLibraryItems plugin: calling uploadItem...');
 		cordova.exec(onSuccess, onError, 'ListLibraryItems', 'uploadItem', [payload]);
-	},
-
-	listMediaBuckets: function(onSuccess, onError) {
-		console.log('ListLibraryItems plugin: calling listMediaBuckets...');
-		cordova.exec(onSuccess, onError, 'ListLibraryItems', 'listMediaBuckets', []);
 	}
 };
 
