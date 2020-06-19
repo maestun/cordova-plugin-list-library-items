@@ -321,7 +321,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 }
                 hb.add("Content-Length","" + FILE_SZ);
                 hb.add("User-Agent", System.getProperty("http.agent"));
-                hb.add("Expect","100-continue");
+                //hb.add("Expect","100-continue");
                 final String contentType = hb.get("Content-Type");
 
                 thumb = createThumbnail(file_path, contentType);
