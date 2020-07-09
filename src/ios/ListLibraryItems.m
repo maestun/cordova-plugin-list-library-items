@@ -13,6 +13,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     CDVInvokedUrlCommand * mCommand;
     NSURL * mLocalTempURL;
     NSDictionary * mReceivedData;
+    NSURLSession * session;
 }
 
 @end
@@ -22,6 +23,16 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
  
 - (void)pluginInitialize {
 	// Plugin specific initialize login goes here
+    NSLog(@"Plugin is initializing...");
+    // Configuration of session
+    NSString * mylibraryId = @"io.cozy.drive.mobile.upload";
+    NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:mylibraryId];
+    [config setDiscretionary:YES]; //Leaving iOS scheduling background tasks
+    [config setSessionSendsLaunchEvents:YES]; // Launches app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
+    
+    // Session creation, based on config created right before
+    session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
+    NSLog(@"Plugin Initialization done.");
 }
 
 
@@ -103,6 +114,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     if ([payload[@"httpMethod"] length] > 0 ) {
         httpMethod = payload[@"httpMethod"];
     }
+     
     // try to fetch asset
     PHFetchResult<PHAsset *> * assets = [PHAsset fetchAssetsWithLocalIdentifiers:@[libraryId] options:kNilOptions];
     if([assets count] == 0) {
@@ -144,13 +156,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                             NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[@"-1", message, libraryId, uploadUrl] forKeys:@[@"code", @"message", @"source", @"target"]];
                             [self returnUploadResult:NO payload:json command:command];
                         } else {
-                            // create upload session
-                            NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:libraryId];
-                            [config setDiscretionary:YES]; // iOS will perform background upload when better suited
-                            [config setSessionSendsLaunchEvents:YES]; // launch app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
-        //                    NSURLSessionConfiguration * config = [NSURLSessionConfiguration defaultSessionConfiguration];
-                            NSURLSession * session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
-
                             NSMutableURLRequest * request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:uploadUrl]];
                             [request setHTTPMethod: httpMethod];
                             
