@@ -24,9 +24,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 - (void)pluginInitialize {
 	// Plugin specific initialize login goes here
     NSLog(@"Plugin is initializing...");
+
     // Configuration of session
-    NSString * mylibraryId = @"io.cozy.drive.mobile.upload";
-    NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:mylibraryId];
+    NSString * mySessionId = @"io.cozy.drive.mobile.upload";
+    NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:mySessionId];
     [config setDiscretionary:YES]; //Leaving iOS scheduling background tasks
     [config setSessionSendsLaunchEvents:YES]; // Launches app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
     
