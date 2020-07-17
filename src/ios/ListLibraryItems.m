@@ -14,6 +14,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSURL * mLocalTempURL;
     NSDictionary * mReceivedData;
     NSURLSession * session;
+    int64_t * receivedData;
+    NSURLSessionTask * currentTask;
 }
 
 @end
@@ -24,18 +26,16 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 - (void)pluginInitialize {
 	// Plugin specific initialize login goes here
     NSLog(@"Plugin is initializing...");
-
+    
     // Configuration of session
     NSString * mySessionId = @"io.cozy.drive.mobile.upload";
     NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:mySessionId];
-    [config setDiscretionary:YES]; //Leaving iOS scheduling background tasks
+    [config setDiscretionary:YES]; // Leaving iOS scheduling background tasks
     [config setSessionSendsLaunchEvents:YES]; // Launches app when upload finishes, calls "handleEventsForBackgroundURLSession" in AppDelegate
-    
     // Session creation, based on config created right before
     session = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:[NSOperationQueue mainQueue]];
     NSLog(@"Plugin Initialization done.");
 }
-
 
 - (BOOL)checkAuthorization {
     return ([PHPhotoLibrary authorizationStatus] == PHAuthorizationStatusAuthorized);
@@ -167,8 +167,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
                             [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
                             [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
-                            NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
-                            [task resume];
+                            currentTask = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
+                            [currentTask resume];
                         }
                     }];
                 }
@@ -292,7 +292,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
 - (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
                                              completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler {
-    
     NSLog(@"didReceiveChallenge");
     NSURLCredential * credential = [NSURLCredential credentialForTrust:challenge.protectionSpace.serverTrust];
     completionHandler(NSURLSessionAuthChallengeUseCredential, credential);
@@ -306,7 +305,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didSendBodyData:(int64_t)bytesSent totalBytesSent:(int64_t)totalBytesSent totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
     NSLog(@"didSendBodyData: send %lld / %lld", totalBytesSent, totalBytesExpectedToSend);
     // TODO: call JS
-    
 }
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didCompleteWithError:(NSError *)error {
@@ -320,6 +318,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         NSString * errorMessage;
         
         if (error) {
+            NSLog(@"--- STATUS NOK ---");
             NSLog(@"Error: %@", error);
             errorMessage = [error localizedDescription];
         }
@@ -327,9 +326,13 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             errorMessage = [NSHTTPURLResponse localizedStringForStatusCode:status];
         }
         NSLog(@"Error: %@", error);
-        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], errorMessage, [mLocalTempURL absoluteString], target]
-                                                                        forKeys:@[@"code", @"message", @"source", @"target"]];
-        [self returnUploadResult:NO payload:json command:mCommand];
+        if(mLocalTempURL == nil) {
+            NSLog(@"The mLocalTempURL is nil, the app has been killed during upload.");
+        } else {
+            NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], errorMessage, [mLocalTempURL absoluteString], target]
+            forKeys:@[@"code", @"message", @"source", @"target"]];
+            [self returnUploadResult:NO payload:json command:mCommand];
+        }
     } else {
         NSLog(@"--- STATUS OK ---");
         NSLog(@"%@", response);
