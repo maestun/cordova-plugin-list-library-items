@@ -100,13 +100,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     [[self commandDelegate] sendPluginResult:pluginResult callbackId:[aCommand callbackId]];
 }
 
-- (bool)isTaskCanceledDueToAppKill:(NSURL*)aLocalTempURL error:(NSError *)anError status:(long)aStatus errormessage:(NSString *)anErrorMessage target:(NSString *)aTarget {
+- (bool)isTaskCanceledDueToAppKill:(NSURL*)aLocalTempURL error:(NSError *)anError {
     if(aLocalTempURL == nil && [anError code] == NSURLErrorCancelled) {
         return true;
     } else {
-        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld",aStatus], anErrorMessage,[aLocalTempURL absoluteString], aTarget]
-                                                                        forKeys:@[@"code", @"message", @"source", @"target"]];
-        [self returnUploadResult:NO payload:json command:mCommand];
         return false;
     }
 }
@@ -175,7 +172,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
                             [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
                             [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
-                            NSURLSessionTask *task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
+                            NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
                             [task resume];
                         }
                     }];
@@ -332,7 +329,13 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             errorMessage = [NSHTTPURLResponse localizedStringForStatusCode:status];
         }
         NSLog(@"Error: %@", error);
-        [self isTaskCanceledDueToAppKill:mLocalTempURL error:error status:status errormessage:errorMessage target:target];
+        
+        if(![self isTaskCanceledDueToAppKill:mLocalTempURL error:error]) {
+            NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld",status], errorMessage,[mLocalTempURL absoluteString], target]
+                                                                            forKeys:@[@"code", @"message", @"source", @"target"]];
+            [self returnUploadResult:NO payload:json command:mCommand];
+        }
+        
     } else {
         NSLog(@"--- STATUS OK ---");
         NSLog(@"%@", response);
