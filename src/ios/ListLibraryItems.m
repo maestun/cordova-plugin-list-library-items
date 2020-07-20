@@ -14,8 +14,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSURL * mLocalTempURL;
     NSDictionary * mReceivedData;
     NSURLSession * session;
-    int64_t * receivedData;
-    NSURLSessionTask * currentTask;
 }
 
 @end
@@ -102,6 +100,16 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     [[self commandDelegate] sendPluginResult:pluginResult callbackId:[aCommand callbackId]];
 }
 
+- (bool)isTaskCanceledDueToAppKill:(NSURL*)aLocalTempURL error:(NSError *)anError status:(long)aStatus errormessage:(NSString *)anErrorMessage target:(NSString *)aTarget {
+    if(aLocalTempURL == nil && [anError code] == NSURLErrorCancelled) {
+        return true;
+    } else {
+        NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld",aStatus], anErrorMessage,[aLocalTempURL absoluteString], aTarget]
+                                                                        forKeys:@[@"code", @"message", @"source", @"target"]];
+        [self returnUploadResult:NO payload:json command:mCommand];
+        return false;
+    }
+}
 
 - (void)uploadItem:(CDVInvokedUrlCommand *)command {
     
@@ -167,8 +175,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
                             [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
                             [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
-                            currentTask = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
-                            [currentTask resume];
+                            NSURLSessionTask *task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
+                            [task resume];
                         }
                     }];
                 }
@@ -316,9 +324,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSString * target = [[[task originalRequest] URL] relativeString];
     if(error || (status / 100) != 2) {
         NSString * errorMessage;
-        
         if (error) {
-            NSLog(@"--- STATUS NOK ---");
             NSLog(@"Error: %@", error);
             errorMessage = [error localizedDescription];
         }
@@ -326,13 +332,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             errorMessage = [NSHTTPURLResponse localizedStringForStatusCode:status];
         }
         NSLog(@"Error: %@", error);
-        if(mLocalTempURL == nil) {
-            NSLog(@"The mLocalTempURL is nil, the app has been killed during upload.");
-        } else {
-            NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld", status], errorMessage, [mLocalTempURL absoluteString], target]
-            forKeys:@[@"code", @"message", @"source", @"target"]];
-            [self returnUploadResult:NO payload:json command:mCommand];
-        }
+        [self isTaskCanceledDueToAppKill:mLocalTempURL error:error status:status errormessage:errorMessage target:target];
     } else {
         NSLog(@"--- STATUS OK ---");
         NSLog(@"%@", response);
