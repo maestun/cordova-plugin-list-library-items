@@ -13,8 +13,17 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     CDVInvokedUrlCommand * mCommand;
     NSURL * mLocalTempURL;
     NSDictionary * mReceivedData;
+    
     NSURLSession * session;
+    NSURLSessionTask * currentTask;
+    
+    NSTimer * uploadTimeout;
+    
+    int64_t oldProgressUploadData;
+    int64_t newProgressUploadData;
 }
+
+- (void)checkProgress:(NSTimer *)timeout;
 
 @end
 
@@ -24,7 +33,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 - (void)pluginInitialize {
 	// Plugin specific initialize login goes here
     NSLog(@"Plugin is initializing...");
-    
     // Configuration of session
     NSString * mySessionId = @"io.cozy.drive.mobile.upload";
     NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:mySessionId];
@@ -39,14 +47,12 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     return ([PHPhotoLibrary authorizationStatus] == PHAuthorizationStatusAuthorized);
 }
 
-
 - (void)isAuthorized:(CDVInvokedUrlCommand *)command {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:[self checkAuthorization]];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     });
 }
-
 
 - (void)returnUserAuthorization:(BOOL)aAuthorized message:(NSString *)aMessage command:(CDVInvokedUrlCommand *)aCommand {
     CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -55,7 +61,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
     [[self commandDelegate] sendPluginResult:pluginResult callbackId:[aCommand callbackId]];
 }
-
 
 - (void)requestReadAuthorization:(CDVInvokedUrlCommand *)command {
     
@@ -90,7 +95,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         }
     }
 }
-
 
 - (void)returnUploadResult:(BOOL)aSuccess payload:(NSDictionary *)aJSON command:(CDVInvokedUrlCommand *)aCommand {
     if(aJSON == nil) {
@@ -172,8 +176,9 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 
                             [request setValue:[[[NSFileManager defaultManager] sizeOfItemAtURL:mLocalTempURL] stringValue] forHTTPHeaderField:@"Content-Length"];
                             [request setValue:[[NSFileManager defaultManager] md5OfItemAtURL:mLocalTempURL] forHTTPHeaderField:@"Content-MD5"];
-                            NSURLSessionUploadTask * task = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
-                            [task resume];
+                            currentTask = [session uploadTaskWithRequest:request fromFile:mLocalTempURL];
+                            [currentTask resume];
+                            [self performSelectorOnMainThread:@selector(startCheckingProgress:) withObject:nil waitUntilDone:YES];
                         }
                     }];
                 }
@@ -186,7 +191,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         }
     }
 }
-
 
 - (void)listItems:(CDVInvokedUrlCommand *)command {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
@@ -260,7 +264,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     });
 }
 
-
 - (NSString *)getMimeTypeFromPath:(NSString*)fullPath {
     NSString * mimeType = @"application/octet-stream";
     if (fullPath) {
@@ -289,12 +292,10 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     return mimeType;
 }
 
-
 #pragma mark - NSURLSessionDelegate
 //- (void)URLSession:(NSURLSession *)session didBecomeInvalidWithError:(NSError *)error {
 //    NSLog(@"didBecomeInvalidWithError");
 //}
-
 - (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
                                              completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler {
     NSLog(@"didReceiveChallenge");
@@ -309,6 +310,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 #pragma mark - NSURLSessionTaskDelegate
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task didSendBodyData:(int64_t)bytesSent totalBytesSent:(int64_t)totalBytesSent totalBytesExpectedToSend:(int64_t)totalBytesExpectedToSend {
     NSLog(@"didSendBodyData: send %lld / %lld", totalBytesSent, totalBytesExpectedToSend);
+    newProgressUploadData = totalBytesSent;
     // TODO: call JS
 }
 
@@ -329,7 +331,6 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
             errorMessage = [NSHTTPURLResponse localizedStringForStatusCode:status];
         }
         NSLog(@"Error: %@", error);
-        
         if(![self isTaskCanceledDueToAppKill:mLocalTempURL error:error]) {
             NSMutableDictionary * json = [NSMutableDictionary dictionaryWithObjects:@[[NSString stringWithFormat:@"%ld",status], errorMessage,[mLocalTempURL absoluteString], target]
                                                                             forKeys:@[@"code", @"message", @"source", @"target"]];
@@ -341,7 +342,9 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         NSLog(@"%@", response);
         [self returnUploadResult:YES payload:mReceivedData command:mCommand];
     }
+    [self performSelectorOnMainThread:@selector(stopCheckingProgress:) withObject:nil waitUntilDone:YES];
 }
+
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask didReceiveData:(NSData *)data {
     if (data == nil) {
         mReceivedData = [NSMutableDictionary dictionary];
@@ -353,8 +356,56 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
         }
     }
 }
+
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)task needNewBodyStream:(nonnull void (^)(NSInputStream * _Nullable))completionHandler {
     NSLog(@"needNewBodyStream");
+}
+
+#pragma mark - Timeout check methods
+// This function starts a repeating timer. As long as it won't be stopped, the timer will call each 30 seconds a function.
+- (void)startCheckingProgress:(id)sender {
+    if(!uploadTimeout){
+        // Initializing variables
+        oldProgressUploadData = newProgressUploadData = 0;
+        // Creating timeout and starting it, passing through userInfo the old progress and new progress.
+        uploadTimeout = [NSTimer scheduledTimerWithTimeInterval:30
+                                                         target:self
+                                                       selector:@selector(checkProgress:)
+                                                       userInfo:nil
+                                                        repeats:YES];
+        NSLog(@"Timeout started !");
+    }
+}
+
+// This function stops the repeating timer, it is useful when an error occured during upload for example.
+- (void)stopCheckingProgress:(id)sender {
+    if([uploadTimeout isValid]) {
+        [uploadTimeout invalidate];
+    }
+    uploadTimeout = nil;
+    NSLog(@"Timeout stopped !");
+}
+
+// This function is called each 30 seconds from the timer when it is active. It calls hasUploadedNewData to know if there is new data since the last 30 seconds.
+- (void)checkProgress:(NSTimer *)timeout {
+    if(![self hasUploadedNewData:oldProgressUploadData :newProgressUploadData]) {
+        [currentTask cancel];
+        NSLog(@"Task canceled");
+        [self performSelectorOnMainThread:@selector(stopCheckingProgress:) withObject:nil waitUntilDone:YES];
+    } else {
+        oldProgressUploadData = newProgressUploadData;
+    }
+}
+
+// This function checks if the old value equals to the new value.
+- (bool)hasUploadedNewData:(int64_t)oldData :(int64_t)newData {
+    if(oldData == newData) {
+        NSLog(@"No data send since 30 seconds");
+        return false;
+    } else {
+        NSLog(@"New data");
+        return true;
+    }
 }
 
 @end
