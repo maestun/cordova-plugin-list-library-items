@@ -13,12 +13,9 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     CDVInvokedUrlCommand * mCommand;
     NSURL * mLocalTempURL;
     NSDictionary * mReceivedData;
-    
     NSURLSession * session;
     NSURLSessionTask * currentTask;
-    
     NSTimer * uploadTimeout;
-    
     int64_t oldProgressUploadData;
     int64_t newProgressUploadData;
 }
@@ -33,6 +30,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 - (void)pluginInitialize {
 	// Plugin specific initialize login goes here
     NSLog(@"Plugin is initializing...");
+    
     // Configuration of session
     NSString * mySessionId = @"io.cozy.drive.mobile.upload";
     NSURLSessionConfiguration * config = [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:mySessionId];
@@ -47,12 +45,14 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     return ([PHPhotoLibrary authorizationStatus] == PHAuthorizationStatusAuthorized);
 }
 
+
 - (void)isAuthorized:(CDVInvokedUrlCommand *)command {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsBool:[self checkAuthorization]];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     });
 }
+
 
 - (void)returnUserAuthorization:(BOOL)aAuthorized message:(NSString *)aMessage command:(CDVInvokedUrlCommand *)aCommand {
     CDVPluginResult * pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
@@ -192,6 +192,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     }
 }
 
+
 - (void)listItems:(CDVInvokedUrlCommand *)command {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         // check permissions
@@ -264,6 +265,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     });
 }
 
+
 - (NSString *)getMimeTypeFromPath:(NSString*)fullPath {
     NSString * mimeType = @"application/octet-stream";
     if (fullPath) {
@@ -292,10 +294,12 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     return mimeType;
 }
 
+
 #pragma mark - NSURLSessionDelegate
 //- (void)URLSession:(NSURLSession *)session didBecomeInvalidWithError:(NSError *)error {
 //    NSLog(@"didBecomeInvalidWithError");
 //}
+
 - (void)URLSession:(NSURLSession *)session didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
                                              completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler {
     NSLog(@"didReceiveChallenge");
@@ -362,7 +366,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 }
 
 #pragma mark - Timeout check methods
-// This function starts a repeating timer. As long as it won't be stopped, the timer will call each 30 seconds a function.
+// This function starts a repeating timer. As long as it isn't be stopped, the timer will call a function every 30 seconds.
 - (void)startCheckingProgress:(id)sender {
     if(!uploadTimeout){
         // Initializing variables
@@ -386,7 +390,7 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
     NSLog(@"Timeout stopped !");
 }
 
-// This function is called each 30 seconds from the timer when it is active. It calls hasUploadedNewData to know if there is new data since the last 30 seconds.
+// This function is called every 30 seconds from the timer when it is active. It calls hasUploadedNewData to know if there is new uploaded data in the last 30 seconds.
 - (void)checkProgress:(NSTimer *)timeout {
     if(![self hasUploadedNewData:oldProgressUploadData :newProgressUploadData]) {
         [currentTask cancel];
@@ -400,10 +404,9 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
 // This function checks if the old value equals to the new value.
 - (bool)hasUploadedNewData:(int64_t)oldData :(int64_t)newData {
     if(oldData == newData) {
-        NSLog(@"No data send since 30 seconds");
+        NSLog(@"No data sent since 30 seconds");
         return false;
     } else {
-        NSLog(@"New data");
         return true;
     }
 }
