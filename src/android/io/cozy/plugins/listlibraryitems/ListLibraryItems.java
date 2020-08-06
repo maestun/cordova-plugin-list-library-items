@@ -52,11 +52,6 @@ import okhttp3.MediaType;
 import okhttp3.Call;
 import okio.BufferedSink;
 
-import android.media.ThumbnailUtils;
-import android.graphics.BitmapFactory;
-import android.graphics.Bitmap;
-import android.util.DisplayMetrics;
-
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
 
 public class ListLibraryItems extends CordovaPlugin {
@@ -299,7 +294,6 @@ public class ListLibraryItems extends CordovaPlugin {
             JSONObject headers = json.optJSONObject("headers");
             OkHttpClient client = new OkHttpClient();
             Call call = null;
-            File thumb = null;
             String method = "POST";
             if(httpMethod != ""){
                 method = httpMethod;
@@ -323,19 +317,6 @@ public class ListLibraryItems extends CordovaPlugin {
                 hb.add("User-Agent", System.getProperty("http.agent"));
                 hb.add("Expect","100-continue");
                 final String contentType = hb.get("Content-Type");
-
-                thumb = createThumbnail(file_path, contentType);
-                if(thumb != null && thumb.exists()) {
-                    JSONObject json_progress = new JSONObject();
-                    try {
-                        json_progress.put("thumbnail",thumb.getAbsoluteFile());
-                    } catch (JSONException ex) {
-
-                    }
-                    PluginResult pr = new PluginResult(PluginResult.Status.OK, json_progress);
-                    pr.setKeepCallback(true);
-                    mCallback.sendPluginResult(pr);
-                }
 
                 try {
                     byte[] md5 = this.calculateMD5(file);
@@ -444,9 +425,6 @@ public class ListLibraryItems extends CordovaPlugin {
                 if (call != null) {
                     call.cancel();
                 }
-                if(thumb != null && thumb.exists()) {
-                    thumb.delete();
-                }
             }
             return response_code;
         }
@@ -508,41 +486,6 @@ public class ListLibraryItems extends CordovaPlugin {
                     Log.e("Exception on closing MD5 input stream", e.toString());
                 }
             }
-        }
-
-        private File createThumbnail(String filePath, String contentType) throws IOException {
-            Bitmap bmp = null;
-            String type = "img";
-            if(contentType.startsWith("video")) {
-                bmp = ThumbnailUtils.createVideoThumbnail(filePath, MediaStore.Video.Thumbnails.MINI_KIND);
-                type = "video";
-            } else {
-                BitmapFactory.Options opts = new BitmapFactory.Options();
-                opts.inScaled = true;
-                opts.inDensity = 640;
-                opts.inTargetDensity = DisplayMetrics.DENSITY_LOW;
-                bmp = BitmapFactory.decodeFile(filePath,opts);
-            }
-
-            File thumb = null;
-
-            if(bmp != null) {
-                File thumbDir = new File(mContext.getCacheDir(),"thumbs");
-                boolean exist = thumbDir.exists();
-                if(!exist) {
-                    exist = thumbDir.mkdir();
-                }
-                if(exist) {
-                    thumb = File.createTempFile(type+"-",".png",thumbDir);
-                    if(thumb.exists()) {
-                        FileOutputStream stream = new FileOutputStream(thumb);
-                        bmp.compress(Bitmap.CompressFormat.PNG,100,stream);
-                    } else {
-                        thumb = null;
-                    }
-                }
-            }
-            return thumb;
         }
     }
 }
