@@ -68,16 +68,6 @@ public class ListLibraryItems extends CordovaPlugin {
     private static final String PERMISSION_ERROR = "Permission Denial: This application is not allowed to access Photo data.";
     private SimpleDateFormat mDateFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
 
-    // ISO 8601 constants
-    private static final String ISO_8601_PATTERN_1 = "yyyy-MM-dd'T'HH:mm:ssZ";
-    private static final String ISO_8601_PATTERN_2 = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
-    private static final String[] SUPPORTED_ISO_8601_PATTERNS = new String[]{ISO_8601_PATTERN_1, ISO_8601_PATTERN_2};
-    private static final int TICK_MARK_COUNT = 2;
-    private static final int COLON_PREFIX_COUNT = "+00".length();
-
-    // RFC 1123 constants
-    private static final String RFC_1123_DATE_TIME = "EEE, dd MMM yyyy HH:mm:ss z";
-
     @Override
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
@@ -284,36 +274,6 @@ public class ListLibraryItems extends CordovaPlugin {
         return type;
     }
 
-    // This method parse a ISO8601 (non http date format) to a Date
-    public static Date parseIso8601DateTime(String string) {
-        if (string == null) {
-            return null;
-        }
-        String s = string.replace("Z", "+00:00");
-        for (String pattern : SUPPORTED_ISO_8601_PATTERNS) {
-            String str = s;
-            int colonPosition = pattern.lastIndexOf('Z') - TICK_MARK_COUNT + COLON_PREFIX_COUNT;
-            if (str.length() > colonPosition) {
-                str = str.substring(0, colonPosition) + str.substring(colonPosition + 1);
-            }
-            try {
-                return new SimpleDateFormat(pattern).parse(str);
-            } catch (final ParseException e) {
-                // try the next one
-            }
-        }
-        return null;
-    }
-
-    // This method format a Date to a RFC 1123 String
-    public static String formatRfc1123DateTime(Date date, TimeZone timeZone) {
-        SimpleDateFormat dateFormat = new SimpleDateFormat(RFC_1123_DATE_TIME);
-        if (timeZone != null) {
-            dateFormat.setTimeZone(timeZone);
-        }
-        return dateFormat.format(date);
-    }
-
     private class UploadFilePayload {
         protected CallbackContext mCallbackContext;
         protected JSONObject mJSONObject;
@@ -342,10 +302,9 @@ public class ListLibraryItems extends CordovaPlugin {
             String ISO8601_date = json.optString("createdDate");
             JSONObject headers = json.optJSONObject("headers");
 
-            // Converting date in ISO 8601 to RFC 1123
-            Date date = parseIso8601DateTime(ISO8601_date);
-            TimeZone timeZone = TimeZone.getTimeZone("GMT");
-            String RFC_1123 = formatRfc1123DateTime(date, timeZone);
+            // Converting date in ISO 8601 to RFC 1123 using DateFormatter class
+            Date date = DateFormatter.parseIso8601DateTime(ISO8601_date);
+            String RFC_1123 = DateFormatter.formatRfc1123DateTime(date, TimeZone.getTimeZone("GMT"));
 
             OkHttpClient client = new OkHttpClient();
             Call call = null;
@@ -596,4 +555,48 @@ public class ListLibraryItems extends CordovaPlugin {
             return thumb;
         }
     }
+}
+
+class DateFormatter {
+
+    // ISO 8601 constants
+    private static final String ISO_8601_PATTERN_1 = "yyyy-MM-dd'T'HH:mm:ssZ";
+    private static final String ISO_8601_PATTERN_2 = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+    private static final String[] SUPPORTED_ISO_8601_PATTERNS = new String[]{ISO_8601_PATTERN_1, ISO_8601_PATTERN_2};
+    private static final int TICK_MARK_COUNT = 2;
+    private static final int COLON_PREFIX_COUNT = "+00".length();
+
+    // RFC 1123 constants
+    private static final String RFC_1123_DATE_TIME = "EEE, dd MMM yyyy HH:mm:ss z";
+
+    // This method parse a ISO8601 (non http date format) to a Date
+    public static Date parseIso8601DateTime(String string) {
+        if (string == null) {
+            return null;
+        }
+        String s = string.replace("Z", "+00:00");
+        for (String pattern : SUPPORTED_ISO_8601_PATTERNS) {
+            String str = s;
+            int colonPosition = pattern.lastIndexOf('Z') - TICK_MARK_COUNT + COLON_PREFIX_COUNT;
+            if (str.length() > colonPosition) {
+                str = str.substring(0, colonPosition) + str.substring(colonPosition + 1);
+            }
+            try {
+                return new SimpleDateFormat(pattern).parse(str);
+            } catch (final ParseException e) {
+                // try the next one
+            }
+        }
+        return null;
+    }
+
+    // This method format a Date to a RFC 1123 String
+    public static String formatRfc1123DateTime(Date date, TimeZone timeZone) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(RFC_1123_DATE_TIME);
+        if (timeZone != null) {
+            dateFormat.setTimeZone(timeZone);
+        }
+        return dateFormat.format(date);
+    }
+
 }
