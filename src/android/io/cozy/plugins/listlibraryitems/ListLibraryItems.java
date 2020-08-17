@@ -4,6 +4,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.provider.MediaStore;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
@@ -245,6 +246,7 @@ public class ListLibraryItems extends CordovaPlugin {
                     }
                 }
 
+                item.put("deviceName", Build.MODEL);
                 item.put("mimeType", getMimeType(item.getString("filePath")));
                 buffer.add(item);
 

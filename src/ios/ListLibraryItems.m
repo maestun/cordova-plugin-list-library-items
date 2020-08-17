@@ -247,12 +247,14 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                 
                 NSMutableDictionary * item = [NSMutableDictionary dictionary];
                 NSString * file_name = [asset valueForKey:@"filename"];
+                NSString * deviceName = [UIDevice currentDevice].name;
                 
                 [item setObject:[asset localIdentifier] forKey:@"id"];
                 [item setObject:file_name forKey:@"fileName"];
                 [item setObject:[NSNumber numberWithUnsignedInteger:[asset pixelWidth]] forKey:@"width"];
                 [item setObject:[NSNumber numberWithUnsignedInteger:[asset pixelHeight]] forKey:@"height"];
                 [item setObject:[self getMimeTypeFromPath:file_name] forKey:@"mimeType"];
+                [item setObject:deviceName forKey:@"deviceName"];
                 [item setObject:[df stringFromDate:[asset creationDate]] forKey:@"creationDate"];
 //                if([asset location]) {
 //                    [item setObject:[asset localIdentifier] forKey:@"latitude"];
