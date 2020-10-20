@@ -173,6 +173,8 @@ static NSString * PERMISSION_ERROR = @"Permission Denial: This application is no
                                 [headers setObject:[self getMimeTypeFromPath:resource.originalFilename] forKey:@"Content-Type"];
                                 // Adding creation date of asset to headers
                                 NSDateFormatter * df = [[NSDateFormatter alloc] init];
+                                NSLocale * locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US"];
+                                [df setLocale:locale];
                                 [df setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"GMT"]];
                                 [df setDateFormat:@"EEE',' dd MMM yyyy HH':'mm':'ss 'GMT'"];
                                 [request setValue:[df stringFromDate:[asset creationDate]] forHTTPHeaderField:@"Date"];
