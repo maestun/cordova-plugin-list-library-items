@@ -35,6 +35,7 @@ import java.net.HttpURLConnection;
 import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -42,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.TimeZone;
 
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -65,6 +67,7 @@ public class ListLibraryItems extends CordovaPlugin {
     public void initialize(CordovaInterface cordova, CordovaWebView webView) {
         super.initialize(cordova, webView);
         mContext = this.cordova.getActivity().getApplicationContext();
+        mDateFormatter.setTimeZone(TimeZone.getTimeZone("GMT"));
     }
 
     @Override
@@ -291,7 +294,13 @@ public class ListLibraryItems extends CordovaPlugin {
             String file_path = json.optString("filePath");
             String upload_url = json.optString("serverUrl");
             String httpMethod = json.optString("httpMethod");
+            String ISO8601_date = json.optString("createdDate");
             JSONObject headers = json.optJSONObject("headers");
+
+            // Converting date in ISO 8601 to RFC 1123 using DateFormatter class
+            Date date = DateFormatter.parseIso8601DateTime(ISO8601_date);
+            String RFC_1123 = DateFormatter.formatRfc1123DateTime(date, TimeZone.getTimeZone("GMT"));
+
             OkHttpClient client = new OkHttpClient();
             Call call = null;
             String method = "POST";
@@ -316,6 +325,7 @@ public class ListLibraryItems extends CordovaPlugin {
                 hb.add("Content-Length","" + FILE_SZ);
                 hb.add("User-Agent", System.getProperty("http.agent"));
                 hb.add("Expect","100-continue");
+                hb.add("Date",RFC_1123);
                 final String contentType = hb.get("Content-Type");
 
                 try {
@@ -488,4 +498,48 @@ public class ListLibraryItems extends CordovaPlugin {
             }
         }
     }
+}
+
+class DateFormatter {
+
+    // ISO 8601 constants
+    private static final String ISO_8601_PATTERN_1 = "yyyy-MM-dd'T'HH:mm:ssZ";
+    private static final String ISO_8601_PATTERN_2 = "yyyy-MM-dd'T'HH:mm:ss.SSSZ";
+    private static final String[] SUPPORTED_ISO_8601_PATTERNS = new String[]{ISO_8601_PATTERN_1, ISO_8601_PATTERN_2};
+    private static final int TICK_MARK_COUNT = 2;
+    private static final int COLON_PREFIX_COUNT = "+00".length();
+
+    // RFC 1123 constants
+    private static final String RFC_1123_DATE_TIME = "EEE, dd MMM yyyy HH:mm:ss z";
+
+    // This method parse a ISO8601 (non http date format) to a Date
+    public static Date parseIso8601DateTime(String string) {
+        if (string == null) {
+            return null;
+        }
+        String s = string.replace("Z", "+00:00");
+        for (String pattern : SUPPORTED_ISO_8601_PATTERNS) {
+            String str = s;
+            int colonPosition = pattern.lastIndexOf('Z') - TICK_MARK_COUNT + COLON_PREFIX_COUNT;
+            if (str.length() > colonPosition) {
+                str = str.substring(0, colonPosition) + str.substring(colonPosition + 1);
+            }
+            try {
+                return new SimpleDateFormat(pattern).parse(str);
+            } catch (final ParseException e) {
+                // try the next one
+            }
+        }
+        return null;
+    }
+
+    // This method format a Date to a RFC 1123 String
+    public static String formatRfc1123DateTime(Date date, TimeZone timeZone) {
+        SimpleDateFormat dateFormat = new SimpleDateFormat(RFC_1123_DATE_TIME);
+        if (timeZone != null) {
+            dateFormat.setTimeZone(timeZone);
+        }
+        return dateFormat.format(date);
+    }
+
 }
